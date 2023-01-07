@@ -23,7 +23,10 @@
 ///         B[k] := D[j]
 ///         j := j + 1
 ///
-pub fn merge_sort(arr: Vec<i32>) -> Vec<i32> {
+pub fn merge_sort<T>(arr: Vec<T>) -> Vec<T>
+where
+    T: Ord + Copy,
+{
     let len = arr.len();
     if len <= 1 {
         return arr;
@@ -33,23 +36,22 @@ pub fn merge_sort(arr: Vec<i32>) -> Vec<i32> {
 
     let sorted_left_arr = merge_sort(first_half.into());
     let sorted_right_arr = merge_sort(second_half.into());
-    println!("{:?}", arr);
     merge(sorted_left_arr, sorted_right_arr)
 }
 
-fn merge(left_arr: Vec<i32>, right_arr: Vec<i32>) -> Vec<i32> {
+fn merge<T>(left_arr: Vec<T>, right_arr: Vec<T>) -> Vec<T>
+where
+    T: Ord + Copy,
+{
     let len = left_arr.len();
     let mut merged_vec = vec![];
     let mut i = 0;
     let mut j = 0;
+    // TODO: refactor
     while i < len && j < len {
         if left_arr[i] < right_arr[j] {
             merged_vec.push(left_arr[i]);
             i += 1;
-            /* if i <= len - 1 {
-                remaining_idx = i;
-                remaining_arr = left_arr
-            } */
         } else {
             merged_vec.push(right_arr[j]);
             j += 1;
