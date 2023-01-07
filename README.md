@@ -6,4 +6,4 @@ my notes and implementation (in rust) of some algorithms in:
 Algorithms Illuminated, a book series by Tim Roughgarden 
 
 
-   1. [merge sort](./src/sort/merge.rs.rs)
+   1. [merge sort](./src/sort/merge.rs)
