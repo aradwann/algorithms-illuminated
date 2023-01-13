@@ -1,6 +1,11 @@
-use algorithms_illuminated::sort::merge;
+use algorithms_illuminated::graph::graph::UndirectedGraph;
 
 fn main() {
-    merge(vec![1, 2, 3, 4]);
-    println!("hello from bin");
+    let mut graph = UndirectedGraph::new();
+    println!("{:?}", graph);
+    graph.add_node();
+    graph.add_node();
+
+    graph.add_edge(0, 1);
+    println!("{:?}", graph);
 }
