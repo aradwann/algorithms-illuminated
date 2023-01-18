@@ -14,15 +14,20 @@ struct NodeData {
 type EdgeIndex = usize;
 
 #[derive(Debug)]
-struct EdgeData {
-    node_index1: NodeIndex,
-    node_index2: NodeIndex,
+struct UndirectedEdgeData(NodeIndex, NodeIndex);
+impl UndirectedEdgeData {
+    fn new(node_1: NodeIndex, node_2: NodeIndex) -> Self {
+        if node_1 > node_2 {
+            Self(node_2, node_1)
+        } else {
+            Self(node_1, node_2)
+        }
+    }
 }
-
 #[derive(Debug)]
 pub struct UndirectedGraph {
     nodes: Vec<NodeData>,
-    edges: Vec<EdgeData>,
+    edges: Vec<UndirectedEdgeData>,
 }
 impl UndirectedGraph {
     pub fn new() -> Self {
@@ -38,10 +43,7 @@ impl UndirectedGraph {
     }
     pub fn add_edge(&mut self, source: NodeIndex, target: NodeIndex) -> EdgeIndex {
         let edge_index = self.edges.len();
-        self.edges.push(EdgeData {
-            node_index1: source,
-            node_index2: target,
-        });
+        self.edges.push(UndirectedEdgeData::new(source, target));
 
         let node_data_1 = &mut self.nodes[source];
         node_data_1.edges.push(edge_index);
