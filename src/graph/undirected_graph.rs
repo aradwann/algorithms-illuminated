@@ -21,12 +21,16 @@ type EdgeIndex = usize;
 #[derive(Debug)]
 struct EdgeData(VertexIndex, VertexIndex);
 impl EdgeData {
-    fn new(vertex_1: VertexIndex, vertex_2: VertexIndex) -> Self {
+    fn new(tail: VertexIndex, head: VertexIndex) -> Self {
+        if tail == head {
+            panic!("self-loops aren't allowed atm")
+        }
         // order of vertices does not matter as it is undirected
-        if vertex_1 > vertex_2 {
-            Self(vertex_2, vertex_1)
+        // so i order it that it begins always with the smaller
+        if tail > head {
+            Self(head, tail)
         } else {
-            Self(vertex_1, vertex_2)
+            Self(tail, head)
         }
     }
 }
@@ -53,14 +57,19 @@ impl UndirectedGraph {
         });
         index
     }
-    pub fn add_edge(&mut self, source: VertexIndex, target: VertexIndex) -> EdgeIndex {
+    pub fn add_edge(&mut self, tail: VertexIndex, head: VertexIndex) -> EdgeIndex {
+        for e in &self.edges {
+            if e.0 == tail && e.1 == head {
+                panic!("parallel edges aren't allowed atm")
+            }
+        }
         let edge_index = self.edges.len();
-        self.edges.push(EdgeData::new(source, target));
+        self.edges.push(EdgeData::new(tail, head));
 
-        let vertex_data_1 = &mut self.vertices[source];
+        let vertex_data_1 = &mut self.vertices[tail];
         vertex_data_1.edges.push(edge_index);
 
-        let vertex_data_2 = &mut self.vertices[target];
+        let vertex_data_2 = &mut self.vertices[head];
         vertex_data_2.edges.push(edge_index);
         edge_index
     }
@@ -166,7 +175,46 @@ mod tests {
     use super::*;
 
     #[test]
+    #[should_panic(expected = "self-loops aren't allowed atm")]
+    fn test_create_self_loop() {
+        EdgeData::new(2, 2);
+    }
+
+    #[test]
+    #[should_panic(expected = "parallel edges aren't allowed atm")]
+    fn test_add_parallel_edge() {
+        let mut graph = UndirectedGraph::new();
+
+        graph.add_vertex('s');
+        graph.add_vertex('a');
+
+        graph.add_edge(0, 1);
+        graph.add_edge(0, 1);
+    }
+
+    #[test]
     fn test_create_undirected_graph() {
-       unimplemented!()
+        let mut graph = UndirectedGraph::new();
+
+        graph.add_vertex('s');
+        graph.add_vertex('a');
+        graph.add_vertex('b');
+        graph.add_vertex('c');
+        graph.add_vertex('d');
+        graph.add_vertex('e');
+
+        graph.add_edge(0, 1);
+        graph.add_edge(0, 2);
+        graph.add_edge(1, 3);
+        graph.add_edge(2, 3);
+        graph.add_edge(2, 4);
+        graph.add_edge(3, 4);
+        graph.add_edge(3, 5);
+        graph.add_edge(4, 5);
+
+        // assert graph has 8 vertices
+        assert_eq!(graph.edges.len(), 8);
+        // assert graph has 6 edges
+        assert_eq!(graph.vertices.len(), 6);
     }
 }
