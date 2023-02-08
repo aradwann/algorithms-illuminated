@@ -72,6 +72,65 @@ impl DirectedGraph {
         head.incoming_edges.push(edge_index);
         edge_index
     }
+
+    /// DFS (iterative version) Pseudocode
+    /// Input: graph G= (V, E) in adjancency list representation, and a vertex s ∈ V
+    /// postcondition: a vertex is reachabele from s if and only if it is marked as "explored".
+    /// -------------------------------------------------------------------------------------
+    /// mark all vertices as unexplored
+    /// S := a stack data structure, initialized with s     
+    /// while S is not empty do
+    ///     remove("pop") the vertex v from the front of S
+    ///     if v is unexplored then
+    ///         mark v as explored
+    ///         for each edge (v,w) in v's adjancency list do
+    ///             add("push") w to the front of S
+    pub fn dfs_iterative(&mut self, vertex_index: VertexIndex) {
+        self.mark_all_vertices_unexplored();
+        let mut stack = vec![];
+        stack.push(vertex_index);
+
+        while stack.len() > 0 {
+            let v_index = stack.pop().unwrap();
+            let v = &mut self.vertices[v_index];
+            if v.explored == false {
+                v.explored = true;
+                for edge_index in &v.outgoing_edges {
+                    let edge = &self.edges[*edge_index];
+                    let next_v_index = edge.1;
+                    stack.push(next_v_index);
+                }
+            }
+            println!("stack is {:?}", &stack);
+        }
+    }
+
+    /// DFS (recursive version) Pseudocode
+    /// Input: graph G= (V, E) in adjancency list representation, and a vertex s ∈ V
+    /// postcondition: a vertex is reachabele from s if and only if it is marked as "explored".
+    /// -------------------------------------------------------------------------------------
+    /// // all vertices unexplored before outer call
+    /// mark s as explored
+    /// for each edge (s,v) in s's adjacency list do
+    ///     if v is unexplored then
+    ///         dfs(G, v)
+    pub fn dfs_recursive(&mut self, vertex_index: VertexIndex) {
+        let v = &mut self.vertices[vertex_index];
+        v.explored = true;
+
+        for edge_index in v.outgoing_edges.clone() {
+            let edge = &self.edges[edge_index];
+            let next_v_index = edge.1;
+            if self.vertices[next_v_index].explored == false {
+                println!("vertex index is {:?}", &next_v_index);
+                self.dfs_recursive(next_v_index);
+            }
+        }
+    }
+
+    fn mark_all_vertices_unexplored(&mut self) {
+        self.vertices.iter_mut().map(|n| n.explored = false);
+    }
 }
 
 #[cfg(test)]
