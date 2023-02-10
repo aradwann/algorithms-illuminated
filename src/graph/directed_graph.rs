@@ -92,10 +92,10 @@ impl DirectedGraph {
         let mut stack = vec![];
         stack.push(vertex_index);
 
-        while stack.len() > 0 {
+        while !stack.is_empty() {
             let v_index = stack.pop().unwrap();
             let v = &mut self.vertices[v_index];
-            if v.explored == false {
+            if !v.explored {
                 v.explored = true;
                 for edge_index in &v.outgoing_edges {
                     let edge = &self.edges[*edge_index];
@@ -124,7 +124,7 @@ impl DirectedGraph {
         for edge_index in v.outgoing_edges.clone() {
             let edge = &self.edges[edge_index];
             let next_v_index = edge.1;
-            if self.vertices[next_v_index].explored == false {
+            if !self.vertices[next_v_index].explored {
                 println!("vertex index is {:?}", &next_v_index);
                 self.dfs_recursive(next_v_index);
             }
@@ -146,7 +146,7 @@ impl DirectedGraph {
         let mut current_label = self.vertices.len();
 
         for vertex_index in 0..self.vertices.len() {
-            if self.vertices[vertex_index].explored == false {
+            if !self.vertices[vertex_index].explored {
                 self.dfs_topo(vertex_index, &mut current_label);
             }
         }
@@ -171,7 +171,7 @@ impl DirectedGraph {
         for edge_index in v.outgoing_edges.clone() {
             let edge = &self.edges[edge_index];
             let next_v_index = edge.1;
-            if self.vertices[next_v_index].explored == false {
+            if !self.vertices[next_v_index].explored {
                 self.dfs_topo(next_v_index, current_label);
             }
         }
@@ -263,5 +263,11 @@ mod tests {
         assert_eq!(graph.vertices[1].topo_order, 3);
         assert_eq!(graph.vertices[2].topo_order, 2);
         assert_eq!(graph.vertices[3].topo_order, 4);
+    }
+}
+
+impl Default for DirectedGraph {
+    fn default() -> Self {
+        Self::new()
     }
 }

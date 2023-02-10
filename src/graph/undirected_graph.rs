@@ -90,13 +90,13 @@ impl UndirectedGraph {
         self.mark_all_vertices_unexplored();
         let mut queue = VecDeque::new();
         queue.push_back(self.edges[0].0); // push the first vertex data into the queue
-        while queue.len() != 0 {
+        while !queue.is_empty() {
             let vertex_index = queue.pop_front().unwrap(); // the index of the vertex
             let vertex_data = self.vertices[vertex_index].clone();
             for edge_index in vertex_data.edges {
                 let EdgeData(_, vertex_index_2) = self.edges[edge_index];
                 let vertex_2 = &mut self.vertices[vertex_index_2];
-                if vertex_2.explored == false {
+                if !vertex_2.explored {
                     vertex_2.explored = true;
                     println!("exploring Vertex {:#?}", &vertex_2);
                     queue.push_back(vertex_index_2);
@@ -130,11 +130,11 @@ impl UndirectedGraph {
         self.mark_all_vertices_unexplored();
         let mut num_cc = 0;
         for i in 0..self.vertices.len() {
-            if self.vertices[i].explored == false {
+            if !self.vertices[i].explored {
                 num_cc += 1;
                 let mut queue = VecDeque::new();
                 queue.push_back(i); // push the first vertex index into the queue
-                while queue.len() != 0 {
+                while !queue.is_empty() {
                     let vertex_index = queue.pop_front().unwrap(); // the index of the vertex
                     let vertex_data = self.vertices[vertex_index].clone();
 
@@ -142,7 +142,7 @@ impl UndirectedGraph {
                     for edge_index in vertex_data.edges {
                         let EdgeData(_, vertex_index_2) = self.edges[edge_index];
                         let vertex_2 = &mut self.vertices[vertex_index_2];
-                        if vertex_2.explored == false {
+                        if !vertex_2.explored {
                             vertex_2.explored = true;
                             println!("exploring vertex {:#?}", &vertex_2);
                             queue.push_back(vertex_index_2);
@@ -216,5 +216,11 @@ mod tests {
         assert_eq!(graph.edges.len(), 8);
         // assert graph has 6 edges
         assert_eq!(graph.vertices.len(), 6);
+    }
+}
+
+impl Default for UndirectedGraph {
+    fn default() -> Self {
+        Self::new()
     }
 }
