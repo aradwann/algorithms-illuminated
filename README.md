@@ -19,3 +19,4 @@ graphs are represented with adjancency list, currently (with two usize Vecs in R
       2. [undirected connected componenets UCC](./src/graph/undirected_graph.rs#L129-L154)
    2. [directed graph](./src/graph/directed_graph.rs) 
       1. depth-first search DFS ([iterative](./src/graph/directed_graph.rs#L88-L106) & [recursive](./src/graph/directed_graph.rs#L117-L129))
+      2. [Topo Sort](./src/graph/directed_graph.rs#L143-L153) 

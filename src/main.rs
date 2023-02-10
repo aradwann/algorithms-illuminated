@@ -12,6 +12,6 @@ fn main() {
     graph.add_edge(0, 2);
     graph.add_edge(1, 3);
     graph.add_edge(2, 3);
-    
-    graph.dfs_recursive(0);
+
+    graph.topo_sort();
 }

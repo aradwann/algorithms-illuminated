@@ -17,11 +17,12 @@ struct VertexData {
     value: char,
     explored: bool,
     cc_value: usize,
+    topo_order: usize,
 }
 
 type EdgeIndex = usize;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct EdgeData(VertexIndex, VertexIndex);
 impl EdgeData {
     fn new(tail: VertexIndex, head: VertexIndex) -> Self {
@@ -52,7 +53,8 @@ impl DirectedGraph {
             incoming_edges: vec![],
             value,
             explored: false,
-            cc_value: 0, // 0 means no cc value yet
+            cc_value: 0,   // 0 means no cc value yet
+            topo_order: 0, // means no value yet
         });
     }
 
@@ -115,6 +117,7 @@ impl DirectedGraph {
     ///     if v is unexplored then
     ///         dfs(G, v)
     pub fn dfs_recursive(&mut self, vertex_index: VertexIndex) {
+        // vertices must be marked unexplored before calling this function
         let v = &mut self.vertices[vertex_index];
         v.explored = true;
 
@@ -128,8 +131,71 @@ impl DirectedGraph {
         }
     }
 
+    /// TopoSort Pseudocode
+    /// Input: directed acyclic graph G= (V, E) in adjancency list representation
+    /// postcondition: the f-values of vertices constitute a topological ordering of G.
+    /// -------------------------------------------------------------------------------------
+    /// mark all vertices as unexplored
+    /// curLabel := |V| // keeps track of ordering
+    /// for every v ∈ V do
+    ///     if v is unexplored then // in a prior DFS
+    ///         DFS-Topo(G, v)
+    pub fn topo_sort(&mut self) {
+        self.mark_all_vertices_unexplored();
+
+        let mut current_label = self.vertices.len();
+
+        for vertex_index in 0..self.vertices.len() {
+            if self.vertices[vertex_index].explored == false {
+                self.dfs_topo(vertex_index, &mut current_label);
+            }
+        }
+    }
+
+    /// DFS-Topo Pseudocode
+    /// Input: graph G= (V, E) in adjancency list representation and and a vertex s ∈ V
+    /// postcondition: every vertex reachable from s is marked as 'explored' and has an assigned f-value
+    /// -------------------------------------------------------------------------------------
+    /// mark s as explored
+    ///
+    /// for each edge (s,v) in s's outgoing adjacency list do
+    ///     if v is unexplored then
+    ///         DFS-Topo(G,v)
+    /// f(s) := curLabel    // s's position in ordering
+    /// curLabel := curLabel -1 // work right-to-left
+    fn dfs_topo(&mut self, vertex_index: VertexIndex, current_label: &mut usize) {
+        // vertices must be marked unexplored before calling this function
+        let v = &mut self.vertices[vertex_index];
+        v.explored = true;
+
+        for edge_index in v.outgoing_edges.clone() {
+            let edge = &self.edges[edge_index];
+            let next_v_index = edge.1;
+            if self.vertices[next_v_index].explored == false {
+                self.dfs_topo(next_v_index, current_label);
+            }
+        }
+        let v = &mut self.vertices[vertex_index];
+        v.topo_order = *current_label;
+        *current_label -= 1;
+        println!(
+            "vertex index is {} and its topo order is {} ",
+            v.value, v.topo_order
+        );
+    }
+    ////////////////// helpers /////////////////////
     fn mark_all_vertices_unexplored(&mut self) {
         self.vertices.iter_mut().map(|n| n.explored = false);
+    }
+
+    fn is_acyclic(&self) -> bool {
+        // for v in &self.vertices {
+        //     if v.incoming_edges.len() == 0 {
+        //         return true;
+        //     }
+        // }
+        // return false;
+        unimplemented!()
     }
 }
 
@@ -175,5 +241,27 @@ mod tests {
         assert_eq!(graph.vertices.len(), 4);
         // assert first vertex is a source vertex as initialized
         assert_eq!(graph.vertices[0].incoming_edges.len(), 0);
+    }
+
+    #[test]
+    fn test_topo_sort() {
+        let mut graph = DirectedGraph::new();
+
+        graph.add_vertex('s');
+        graph.add_vertex('v');
+        graph.add_vertex('w');
+        graph.add_vertex('t');
+
+        graph.add_edge(0, 1);
+        graph.add_edge(0, 2);
+        graph.add_edge(1, 3);
+        graph.add_edge(2, 3);
+
+        graph.topo_sort();
+
+        assert_eq!(graph.vertices[0].topo_order, 1);
+        assert_eq!(graph.vertices[1].topo_order, 3);
+        assert_eq!(graph.vertices[2].topo_order, 2);
+        assert_eq!(graph.vertices[3].topo_order, 4);
     }
 }
