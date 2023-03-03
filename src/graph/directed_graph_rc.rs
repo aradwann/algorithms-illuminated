@@ -15,9 +15,9 @@ use std::{
 ///
 
 #[derive(Debug)]
-struct Vertex {
-    outgoing_edges: RefCell<Vec<Rc<Vertex>>>,
-    incoming_edges: RefCell<Vec<Weak<Vertex>>>,
+pub struct Vertex {
+    outgoing_edges: Vec<Rc<RefCell<Vertex>>>,
+    incoming_edges: Vec<Weak<RefCell<Vertex>>>,
     value: Option<char>,
     explored: bool,
     cc_value: Option<usize>,
@@ -27,8 +27,8 @@ struct Vertex {
 impl Vertex {
     fn new() -> Self {
         Vertex {
-            outgoing_edges: RefCell::new(vec![]),
-            incoming_edges: RefCell::new(vec![]),
+            outgoing_edges: vec![],
+            incoming_edges: vec![],
             value: None,
             explored: false,
             cc_value: None,
@@ -39,7 +39,7 @@ impl Vertex {
 
 #[derive(Debug)]
 pub struct DirectedGraphRc {
-    vertices: Vec<Rc<Vertex>>,
+    pub vertices: Vec<Rc<RefCell<Vertex>>>,
 }
 
 impl DirectedGraphRc {
@@ -48,14 +48,48 @@ impl DirectedGraphRc {
     }
 
     pub fn add_vertex(&mut self) {
-        let new_vertex = Rc::new(Vertex::new());
+        let new_vertex = Rc::new(RefCell::new(Vertex::new()));
         self.vertices.push(new_vertex);
     }
 
     pub fn add_edge(&mut self, tail_index: usize, head_index: usize) {
         let tail = &self.vertices[tail_index];
         let head = &self.vertices[head_index];
-        tail.outgoing_edges.borrow_mut().push(Rc::clone(&head));
-        head.incoming_edges.borrow_mut().push(Rc::downgrade(&tail));
+        tail.borrow_mut().outgoing_edges.push(Rc::clone(head));
+        head.borrow_mut().incoming_edges.push(Rc::downgrade(tail));
+    }
+
+    /// DFS (recursive version) Pseudocode
+    /// Input: graph G= (V, E) in adjancency list representation, and a vertex s ∈ V
+    /// postcondition: a vertex is reachabele from s if and only if it is marked as "explored".
+    /// -------------------------------------------------------------------------------------
+    /// // all vertices unexplored before outer call
+    /// mark s as explored
+    /// for each edge (s,v) in s's adjacency list do
+    ///     if v is unexplored then
+    ///         dfs(G, v)
+    pub fn dfs_recursive(&mut self, s: &Rc<RefCell<Vertex>>) {
+        // vertices must be marked unexplored before calling this function
+        // let s = self.vertices[vertex_index];
+        s.borrow_mut().explored = true;
+
+        for v in &s.borrow().outgoing_edges {
+            if !v.borrow().explored {
+                self.dfs_recursive(v);
+            }
+        }
+    }
+
+    ////////////////// helpers /////////////////////
+    fn mark_all_vertices_unexplored(&mut self) {
+        self.vertices
+            .iter_mut()
+            .map(|n| n.borrow_mut().explored = false);
+    }
+}
+
+impl Default for DirectedGraphRc {
+    fn default() -> Self {
+        Self::new()
     }
 }
