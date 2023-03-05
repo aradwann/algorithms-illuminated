@@ -18,6 +18,7 @@ struct VertexData {
     explored: bool,
     cc_value: usize,
     topo_order: usize,
+    scc: usize,
 }
 
 type EdgeIndex = usize;
@@ -55,6 +56,7 @@ impl DirectedGraph {
             explored: false,
             cc_value: 0,   // 0 means no cc value yet
             topo_order: 0, // means no value yet
+            scc: 0,        // means no value yet
         });
     }
 
@@ -153,7 +155,7 @@ impl DirectedGraph {
     }
 
     /// DFS-Topo Pseudocode
-    /// Input: graph G= (V, E) in adjancency list representation and and a vertex s ∈ V
+    /// Input: graph G= (V, E) in adjancency list representation and a vertex s ∈ V
     /// postcondition: every vertex reachable from s is marked as 'explored' and has an assigned f-value
     /// -------------------------------------------------------------------------------------
     /// mark s as explored
@@ -183,6 +185,115 @@ impl DirectedGraph {
             v.value, v.topo_order
         );
     }
+
+    pub fn topo_sort_reversed(&mut self) {
+        self.mark_all_vertices_unexplored();
+
+        let mut current_label = self.vertices.len();
+
+        for vertex_index in 0..self.vertices.len() {
+            if !self.vertices[vertex_index].explored {
+                self.dfs_topo_reversed(vertex_index, &mut current_label);
+            }
+        }
+    }
+
+    fn dfs_topo_reversed(&mut self, vertex_index: VertexIndex, current_label: &mut usize) {
+        // vertices must be marked unexplored before calling this function
+        let v = &mut self.vertices[vertex_index];
+        v.explored = true;
+
+        for edge_index in v.incoming_edges.clone() {
+            let edge = &self.edges[edge_index];
+            let next_v_index = edge.1;
+            if !self.vertices[next_v_index].explored {
+                self.dfs_topo(next_v_index, current_label);
+            }
+        }
+        let v = &mut self.vertices[vertex_index];
+        v.topo_order = *current_label;
+        *current_label -= 1;
+        println!(
+            "vertex index is {} and its topo order is {} ",
+            v.value, v.topo_order
+        );
+    }
+
+    /// Kosaraju Pseudocode
+    /// Input: graph G= (V, E) in adjancency list representation, with V = {1,2,3,...,n}
+    /// postcondition: for every v,w ∈ V, scc(v) = scc(w) if and only if v,w are in the same SCC of G
+    /// -------------------------------------------------------------------------------------
+    /// G_rev := G with all edges reversed
+    ///
+    /// // first pass of depth-first search
+    /// // (computes f(v)'s, the magical ordering)
+    /// TopoSort(G_rev)
+    ///
+    /// // second pass of depth-first search
+    /// // (finds SCCs in reverse topological order)
+    /// mark all vertices of G as unexplored
+    /// numSCC := 0
+    /// for each v ∈ V, in increasing order of f(v) do
+    ///     if v is unexplored then
+    ///         numSCC := numSCC +1
+    ///         // assign scc-values
+    ///         DFS-SCC(G, v)
+    ///
+    pub fn kosaraju(&mut self) -> usize {
+        self.mark_all_vertices_unexplored();
+
+        // first dfs pass
+        // reversed graph
+        // let mut g_reversed = DirectedGraph::new();
+        // g_reversed.vertices = self.vertices.clone();
+        // g_reversed.edges = self
+        //     .edges
+        //     .clone()
+        //     .iter_mut()
+        //     .map(|e| EdgeData::new(e.1, e.0))
+        //     .collect();
+        // g_reversed.topo_sort();
+
+        self.topo_sort_reversed();
+
+        // second dfs pass
+
+        self.mark_all_vertices_unexplored();
+        let mut num_scc: usize = 0;
+
+        for vertex_index in 0..self.vertices.len() {
+            if !self.vertices[vertex_index].explored {
+                num_scc += 1;
+                self.dfs_scc(vertex_index, &mut num_scc);
+            }
+        }
+        num_scc
+    }
+
+    /// DSF-SCC Pseudocode
+    /// Input: directed graph G= (V, E) in adjancency list representation and a vertex s ∈ V
+    /// postcondition: every vertex reachable from s is marked as 'explored' and has an assigned scc-value
+    /// -------------------------------------------------------------------------------------
+    /// mark s as explored
+    /// scc(s) := numSCC // global variable above
+    /// for each edge (s,v) in s's outgoing adjacency list do
+    ///     if v is unexplored then
+    ///         DFS-SCC (G,v)
+    ///
+    fn dfs_scc(&mut self, vertex_index: VertexIndex, num_scc: &mut usize) {
+        let v = &mut self.vertices[vertex_index];
+        v.explored = true;
+        v.scc = *num_scc;
+
+        for edge_index in v.outgoing_edges.clone() {
+            let edge = &self.edges[edge_index];
+            let next_v_index = edge.1;
+            if !self.vertices[next_v_index].explored {
+                self.dfs_scc(next_v_index, num_scc);
+            }
+        }
+    }
+
     ////////////////// helpers /////////////////////
     fn mark_all_vertices_unexplored(&mut self) {
         self.vertices.iter_mut().map(|n| n.explored = false);

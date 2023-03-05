@@ -22,6 +22,7 @@ pub struct Vertex {
     explored: bool,
     // cc_value: Option<usize>,
     topo_order: Option<usize>,
+    scc: Option<usize>,
 }
 
 impl Vertex {
@@ -33,6 +34,7 @@ impl Vertex {
             explored: false,
             // cc_value: None,
             topo_order: None,
+            scc: None,
         }
     }
 }
@@ -53,6 +55,10 @@ impl DirectedGraphRc {
     }
 
     pub fn add_edge(&mut self, tail_index: usize, head_index: usize) {
+        if tail_index == head_index {
+            panic!("self-loops aren't allowed atm")
+        }
+
         let tail = &self.vertices[tail_index];
         let head = &self.vertices[head_index];
         tail.borrow_mut().outgoing_edges.push(Rc::clone(head));
@@ -132,6 +138,66 @@ impl DirectedGraphRc {
         );
     }
 
+    /// Kosaraju Pseudocode
+    /// Input: graph G= (V, E) in adjancency list representation, with V = {1,2,3,...,n}
+    /// postcondition: for every v,w ∈ V, scc(v) = scc(w) if and only if v,w are in the same SCC of G
+    /// -------------------------------------------------------------------------------------
+    /// G_rev := G with all edges reversed
+    ///
+    /// // first pass of depth-first search
+    /// // (computes f(v)'s, the magical ordering)
+    /// TopoSort(G_rev)
+    ///
+    /// // second pass of depth-first search
+    /// // (finds SCCs in reverse topological order)
+    /// mark all vertices of G as unexplored
+    /// numSCC := 0
+    /// for each v ∈ V, in increasing order of f(v) do
+    ///     if v is unexplored then
+    ///         numSCC := numSCC +1
+    ///         // assign scc-values
+    ///         DFS-SCC(G, v)
+    ///
+    pub fn kosaraju(&mut self) -> usize {
+        self.mark_all_vertices_unexplored();
+
+        // first dfs pass
+
+        // second dfs pass
+
+        self.mark_all_vertices_unexplored();
+        let mut num_scc: usize = 0;
+
+        // for vertex_index in 0..self.vertices.len() {
+        //     if !self.vertices[vertex_index].explored {
+        //         num_scc += 1;
+        //         self.dfs_scc(vertex_index, &mut num_scc);
+        //     }
+        // }
+        num_scc
+    }
+
+    /// DSF-SCC Pseudocode
+    /// Input: directed graph G= (V, E) in adjancency list representation and a vertex s ∈ V
+    /// postcondition: every vertex reachable from s is marked as 'explored' and has an assigned scc-value
+    /// -------------------------------------------------------------------------------------
+    /// mark s as explored
+    /// scc(s) := numSCC // global variable above
+    /// for each edge (s,v) in s's outgoing adjacency list do
+    ///     if v is unexplored then
+    ///         DFS-SCC (G,v)
+    ///
+    fn dfs_scc(&mut self, s: &Rc<RefCell<Vertex>>, num_scc: &mut usize) {
+        s.borrow_mut().explored = true;
+        s.borrow_mut().scc = Some(*num_scc);
+
+        for v in &s.borrow().outgoing_edges {
+            if !v.borrow().explored {
+                self.dfs_topo(v, num_scc);
+            }
+        }
+    }
+
     ////////////////// helpers /////////////////////
     fn mark_all_vertices_unexplored(&mut self) {
         self.vertices
@@ -148,11 +214,28 @@ impl DirectedGraphRc {
 mod tests {
     use super::*;
 
-    // #[test]
-    // #[should_panic(expected = "self-loops aren't allowed atm")]
-    // fn test_create_self_loop() {
-    //     EdgeData::new(2, 2);
-    // }
+    fn create_simple_graph() -> DirectedGraphRc {
+        let mut graph = DirectedGraphRc::new();
+
+        graph.add_vertex('s');
+        graph.add_vertex('v');
+        graph.add_vertex('w');
+        graph.add_vertex('t');
+
+        graph.add_edge(0, 1);
+        graph.add_edge(0, 2);
+        graph.add_edge(1, 3);
+        graph.add_edge(2, 3);
+
+        graph
+    }
+
+    #[test]
+    #[should_panic(expected = "self-loops aren't allowed atm")]
+    fn test_create_self_loop() {
+        let mut graph = create_simple_graph();
+        graph.add_edge(1, 1);
+    }
 
     // #[test]
     // #[should_panic(expected = "parallel edges aren't allowed atm")]
@@ -168,17 +251,7 @@ mod tests {
 
     #[test]
     fn test_create_directed_graph() {
-        let mut graph = DirectedGraphRc::new();
-
-        graph.add_vertex('s');
-        graph.add_vertex('v');
-        graph.add_vertex('w');
-        graph.add_vertex('t');
-
-        graph.add_edge(0, 1);
-        graph.add_edge(0, 2);
-        graph.add_edge(1, 3);
-        graph.add_edge(2, 3);
+        let graph = create_simple_graph();
 
         // assert graph has 4 vertices
         assert_eq!(graph.vertices().len(), 4);
@@ -191,18 +264,24 @@ mod tests {
     }
 
     #[test]
+    fn test_dfs_recursive() {
+        let graph = create_simple_graph();
+
+        let vertices = graph.vertices();
+
+        let s = &vertices[0];
+
+        graph.dfs_recursive(s);
+
+        // assert that all the vertices are explored
+        vertices.into_iter().for_each(|v| {
+            assert_eq!(v.borrow().explored, true);
+        });
+    }
+
+    #[test]
     fn test_dfs_topo() {
-        let mut graph = DirectedGraphRc::new();
-
-        graph.add_vertex('s');
-        graph.add_vertex('v');
-        graph.add_vertex('w');
-        graph.add_vertex('t');
-
-        graph.add_edge(0, 1);
-        graph.add_edge(0, 2);
-        graph.add_edge(1, 3);
-        graph.add_edge(2, 3);
+        let graph = create_simple_graph();
 
         let vertices = graph.vertices();
         let mut current_label = vertices.len();
@@ -214,18 +293,7 @@ mod tests {
 
     #[test]
     fn test_topo_sort() {
-        let mut graph = DirectedGraphRc::new();
-
-        graph.add_vertex('s');
-        graph.add_vertex('v');
-        graph.add_vertex('w');
-        graph.add_vertex('t');
-
-        graph.add_edge(0, 1);
-        graph.add_edge(0, 2);
-        graph.add_edge(1, 3);
-        graph.add_edge(2, 3);
-
+        let mut graph = create_simple_graph();
         graph.topo_sort();
 
         assert_eq!(graph.vertices()[0].borrow().topo_order, Some(1));
