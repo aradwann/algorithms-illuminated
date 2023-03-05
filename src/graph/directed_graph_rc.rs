@@ -199,10 +199,10 @@ impl DirectedGraphRc {
     }
 
     ////////////////// helpers /////////////////////
-    fn mark_all_vertices_unexplored(&mut self) {
-        self.vertices
-            .iter()
-            .map(|n| n.borrow_mut().explored = false);
+    fn mark_all_vertices_unexplored(&self) {
+        self.vertices.iter().for_each(|v| {
+            v.borrow_mut().explored = false
+        });
     }
 
     pub fn vertices(&self) -> &[Rc<RefCell<Vertex>>] {
@@ -261,6 +261,23 @@ mod tests {
         // assert last vertex is a sink vertex as initialized
         assert_eq!(graph.vertices[3].borrow().incoming_edges.len(), 2);
         assert_eq!(graph.vertices[3].borrow().outgoing_edges.len(), 0);
+    }
+
+    #[test]
+    fn test_mark_all_vertices_unexplored() {
+        let graph = create_simple_graph();
+
+        let vertices = graph.vertices();
+
+        vertices.into_iter().for_each(|v| {
+            v.borrow_mut().explored = true;
+        });
+
+        graph.mark_all_vertices_unexplored();
+        // assert that all the vertices are unexplored
+        vertices.into_iter().for_each(|v| {
+            assert_eq!(v.borrow().explored, false);
+        });
     }
 
     #[test]

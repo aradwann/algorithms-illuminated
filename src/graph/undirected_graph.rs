@@ -105,7 +105,7 @@ impl UndirectedGraph {
         }
     }
     fn mark_all_vertices_unexplored(&mut self) {
-        self.vertices.iter_mut().map(|n| n.explored = false);
+        self.vertices.iter_mut().for_each(|n| n.explored = false);
     }
 
     /// Pseudocode
