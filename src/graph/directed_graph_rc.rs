@@ -14,13 +14,23 @@ use std::{
 /// each vertex maintains two arrays of pointers, one for the outgoing edges and one for the incoming edges
 ///
 
+type VertexRc = Rc<RefCell<Vertex>>;
+type VertexWeak = Weak<RefCell<Vertex>>;
+
+/// named tuple holds the reference to the destination vertex (Rc) and the length of the edge
+#[derive(Debug)]
+struct OutgoingEdge(VertexRc, Option<usize>);
+
+/// named tuple holds the reference to the source vertex (Weak) and the length of the edge
+#[derive(Debug)]
+struct IncomingEdge(VertexWeak, Option<usize>);
+
 #[derive(Debug)]
 pub struct Vertex {
-    outgoing_edges: Vec<Rc<RefCell<Vertex>>>,
-    incoming_edges: Vec<Weak<RefCell<Vertex>>>,
+    outgoing_edges: Vec<OutgoingEdge>,
+    incoming_edges: Vec<IncomingEdge>,
     value: char,
     explored: bool,
-    // cc_value: Option<usize>,
     topo_order: Option<usize>,
     scc: Option<usize>,
 }
@@ -32,7 +42,6 @@ impl Vertex {
             incoming_edges: vec![],
             value,
             explored: false,
-            // cc_value: None,
             topo_order: None,
             scc: None,
         }
@@ -41,7 +50,7 @@ impl Vertex {
 
 #[derive(Debug)]
 pub struct DirectedGraphRc {
-    vertices: Vec<Rc<RefCell<Vertex>>>,
+    vertices: Vec<VertexRc>,
 }
 
 impl DirectedGraphRc {
@@ -54,15 +63,19 @@ impl DirectedGraphRc {
         self.vertices.push(new_vertex);
     }
 
-    pub fn add_edge(&mut self, tail_index: usize, head_index: usize) {
+    pub fn add_edge(&self, tail_index: usize, head_index: usize, length: Option<usize>) {
         if tail_index == head_index {
             panic!("self-loops aren't allowed atm")
         }
 
         let tail = &self.vertices[tail_index];
         let head = &self.vertices[head_index];
-        tail.borrow_mut().outgoing_edges.push(Rc::clone(head));
-        head.borrow_mut().incoming_edges.push(Rc::downgrade(tail));
+        tail.borrow_mut()
+            .outgoing_edges
+            .push(OutgoingEdge(Rc::clone(head), length));
+        head.borrow_mut()
+            .incoming_edges
+            .push(IncomingEdge(Rc::downgrade(tail), length));
     }
 
     /// DFS (recursive version) Pseudocode
@@ -74,14 +87,14 @@ impl DirectedGraphRc {
     /// for each edge (s,v) in s's adjacency list do
     ///     if v is unexplored then
     ///         dfs(G, v)
-    pub fn dfs_recursive(&self, s: &Rc<RefCell<Vertex>>) {
+    pub fn dfs_recursive(&self, s: &VertexRc) {
         // vertices must be marked unexplored before calling this function
         println!("exploring {:#?}", s.borrow().value);
         s.borrow_mut().explored = true;
 
         for v in &s.borrow().outgoing_edges {
-            if !v.borrow().explored {
-                self.dfs_recursive(v);
+            if !v.0.borrow().explored {
+                self.dfs_recursive(&v.0);
             }
         }
     }
@@ -95,7 +108,7 @@ impl DirectedGraphRc {
     /// for every v ∈ V do
     ///     if v is unexplored then // in a prior DFS
     ///         DFS-Topo(G, v)
-    pub fn topo_sort(&mut self) {
+    pub fn topo_sort(&self) {
         // self.mark_all_vertices_unexplored();
         let vertices = &self.vertices;
         let mut current_label = vertices.len();
@@ -118,14 +131,14 @@ impl DirectedGraphRc {
     ///         DFS-Topo(G,v)
     /// f(s) := curLabel    // s's position in ordering
     /// curLabel := curLabel -1 // work right-to-left
-    fn dfs_topo(&self, s: &Rc<RefCell<Vertex>>, current_label: &mut usize) {
+    fn dfs_topo(&self, s: &VertexRc, current_label: &mut usize) {
         // vertices must be marked unexplored before calling this function
 
         s.borrow_mut().explored = true;
 
         for v in &s.borrow().outgoing_edges {
-            if !v.borrow().explored {
-                self.dfs_topo(v, current_label);
+            if !v.0.borrow().explored {
+                self.dfs_topo(&v.0, current_label);
             }
         }
 
@@ -158,7 +171,7 @@ impl DirectedGraphRc {
     ///         // assign scc-values
     ///         DFS-SCC(G, v)
     ///
-    pub fn kosaraju(&mut self) -> usize {
+    pub fn kosaraju(&self) -> usize {
         self.mark_all_vertices_unexplored();
 
         // first dfs pass
@@ -166,7 +179,7 @@ impl DirectedGraphRc {
         // second dfs pass
 
         self.mark_all_vertices_unexplored();
-        let mut num_scc: usize = 0;
+        let num_scc: usize = 0;
 
         // for vertex_index in 0..self.vertices.len() {
         //     if !self.vertices[vertex_index].explored {
@@ -187,25 +200,50 @@ impl DirectedGraphRc {
     ///     if v is unexplored then
     ///         DFS-SCC (G,v)
     ///
-    fn dfs_scc(&mut self, s: &Rc<RefCell<Vertex>>, num_scc: &mut usize) {
+    fn dfs_scc(&self, s: &VertexRc, num_scc: &mut usize) {
         s.borrow_mut().explored = true;
         s.borrow_mut().scc = Some(*num_scc);
 
         for v in &s.borrow().outgoing_edges {
-            if !v.borrow().explored {
-                self.dfs_topo(v, num_scc);
+            if !v.0.borrow().explored {
+                self.dfs_topo(&v.0, num_scc);
+            }
+        }
+    }
+
+    /// Dijkstra Pseudocode
+    /// Input: directed graph G= (V, E) in adjancency list representation and a vertex s ∈ V,
+    ///        a length le >= 0 for each e ∈ E
+    /// postcondition: for every vertex v, the value len(v)
+    ///                equals the true shortest-path distance dist(s,v)
+    /// -------------------------------------------------------------------------------------
+    /// // Initialization
+    /// X := {s}
+    /// len(s) := 0, len(v) := +∞ for every v != s
+    /// // Main loop
+    /// while there is an edge (v,w) with v ∈ X, w ∉ X do
+    ///     (v*,w*) := such an edge minimizing len(v) + lvw
+    ///     add w* to X
+    ///     len(w*) := len(v*) + lv*w*
+    fn dijkstra(&self, s: &VertexRc, num_scc: &mut usize) {
+        s.borrow_mut().explored = true;
+        s.borrow_mut().scc = Some(*num_scc);
+
+        for v in &s.borrow().outgoing_edges {
+            if !v.0.borrow().explored {
+                self.dfs_topo(&v.0, num_scc);
             }
         }
     }
 
     ////////////////// helpers /////////////////////
     fn mark_all_vertices_unexplored(&self) {
-        self.vertices.iter().for_each(|v| {
-            v.borrow_mut().explored = false
-        });
+        self.vertices
+            .iter()
+            .for_each(|v| v.borrow_mut().explored = false);
     }
 
-    pub fn vertices(&self) -> &[Rc<RefCell<Vertex>>] {
+    pub fn vertices(&self) -> &[VertexRc] {
         self.vertices.as_ref()
     }
 }
@@ -222,10 +260,10 @@ mod tests {
         graph.add_vertex('w');
         graph.add_vertex('t');
 
-        graph.add_edge(0, 1);
-        graph.add_edge(0, 2);
-        graph.add_edge(1, 3);
-        graph.add_edge(2, 3);
+        graph.add_edge(0, 1, None);
+        graph.add_edge(0, 2, None);
+        graph.add_edge(1, 3, None);
+        graph.add_edge(2, 3, None);
 
         graph
     }
@@ -233,8 +271,8 @@ mod tests {
     #[test]
     #[should_panic(expected = "self-loops aren't allowed atm")]
     fn test_create_self_loop() {
-        let mut graph = create_simple_graph();
-        graph.add_edge(1, 1);
+        let graph = create_simple_graph();
+        graph.add_edge(1, 1, None);
     }
 
     // #[test]
@@ -269,14 +307,14 @@ mod tests {
 
         let vertices = graph.vertices();
 
-        vertices.into_iter().for_each(|v| {
+        vertices.iter().for_each(|v| {
             v.borrow_mut().explored = true;
         });
 
         graph.mark_all_vertices_unexplored();
         // assert that all the vertices are unexplored
-        vertices.into_iter().for_each(|v| {
-            assert_eq!(v.borrow().explored, false);
+        vertices.iter().for_each(|v| {
+            assert!(!v.borrow().explored);
         });
     }
 
@@ -291,8 +329,8 @@ mod tests {
         graph.dfs_recursive(s);
 
         // assert that all the vertices are explored
-        vertices.into_iter().for_each(|v| {
-            assert_eq!(v.borrow().explored, true);
+        vertices.iter().for_each(|v| {
+            assert!(v.borrow().explored);
         });
     }
 
@@ -310,7 +348,7 @@ mod tests {
 
     #[test]
     fn test_topo_sort() {
-        let mut graph = create_simple_graph();
+        let graph = create_simple_graph();
         graph.topo_sort();
 
         assert_eq!(graph.vertices()[0].borrow().topo_order, Some(1));
