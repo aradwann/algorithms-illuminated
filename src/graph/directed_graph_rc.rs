@@ -120,6 +120,25 @@ impl DirectedGraphRc {
         }
     }
 
+    fn topo_sort_reversed(&mut self) {
+        // self.mark_all_vertices_unexplored();
+        let vertices = &self.vertices;
+        let mut current_label = vertices.len();
+
+        for v in vertices {
+            if !v.borrow().explored {
+                self.dfs_topo_reversed(v, &mut current_label);
+            }
+        }
+
+        // sort graph vertices according to their increasing of their postions
+        let mut sorted_vertices = Vec::with_capacity(vertices.len());
+        for v in vertices {
+            sorted_vertices[v.borrow().topo_order.unwrap() - 1] = v.clone();
+        }
+        self.vertices = sorted_vertices;
+    }
+
     /// DFS-Topo Pseudocode
     /// Input: graph G= (V, E) in adjancency list representation and a vertex s ∈ V
     /// postcondition: every vertex reachable from s is marked as 'explored' and has an assigned f-value
@@ -139,6 +158,29 @@ impl DirectedGraphRc {
         for v in &s.borrow().outgoing_edges {
             if !v.0.borrow().explored {
                 self.dfs_topo(&v.0, current_label);
+            }
+        }
+
+        s.borrow_mut().topo_order = Some(*current_label);
+        *current_label -= 1;
+        println!(
+            "vertex index is {} and its topo order is {} ",
+            s.borrow().value,
+            s.borrow().topo_order.unwrap()
+        );
+    }
+
+    fn dfs_topo_reversed(&self, s: &VertexRc, current_label: &mut usize) {
+        // vertices must be marked unexplored before calling this function
+
+        s.borrow_mut().explored = true;
+
+        // this is the reversed part instead of iterating over the outgoing edges,
+        // you iterate over incoming edges
+        for v in &s.borrow().incoming_edges {
+            let incoming_edge_tail = v.0.upgrade().unwrap();
+            if !incoming_edge_tail.borrow().explored {
+                self.dfs_topo_reversed(&incoming_edge_tail, current_label);
             }
         }
 
@@ -171,22 +213,22 @@ impl DirectedGraphRc {
     ///         // assign scc-values
     ///         DFS-SCC(G, v)
     ///
-    pub fn kosaraju(&self) -> usize {
+    pub fn kosaraju(&mut self) -> usize {
         self.mark_all_vertices_unexplored();
 
         // first dfs pass
-
+        self.topo_sort_reversed();
         // second dfs pass
 
         self.mark_all_vertices_unexplored();
-        let num_scc: usize = 0;
+        let mut num_scc: usize = 0;
 
-        // for vertex_index in 0..self.vertices.len() {
-        //     if !self.vertices[vertex_index].explored {
-        //         num_scc += 1;
-        //         self.dfs_scc(vertex_index, &mut num_scc);
-        //     }
-        // }
+        for v in self.vertices() {
+            if !v.borrow().explored {
+                num_scc += 1;
+                self.dfs_scc(v, &mut num_scc);
+            }
+        }
         num_scc
     }
 

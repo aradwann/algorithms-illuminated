@@ -1,4 +1,4 @@
-use super::DirectedGraph;
+use super::{DirectedGraph, DirectedGraphRc};
 use std::fs;
 
 pub fn build_graph_from_txt(path: &str) -> DirectedGraph {
@@ -18,6 +18,27 @@ pub fn build_graph_from_txt(path: &str) -> DirectedGraph {
 
     for &(tail, head) in &edges_tuple_vec {
         graph.add_edge(tail as usize, head as usize);
+    }
+    graph
+}
+
+pub fn build_graph_rc_from_txt(path: &str) -> DirectedGraphRc {
+    // read the text file
+    let contents = fs::read_to_string(path).unwrap();
+
+    let edges_tuple_vec = extract_edges(contents);
+
+    // get the last vertex in the array
+    let last_vertex = edges_tuple_vec[edges_tuple_vec.len() - 1].0;
+
+    let mut graph = DirectedGraphRc::new();
+
+    for _ in 0..=last_vertex {
+        graph.add_vertex('i');
+    }
+
+    for &(tail, head) in &edges_tuple_vec {
+        graph.add_edge(tail as usize, head as usize, None);
     }
     graph
 }
