@@ -7,6 +7,7 @@ Algorithms Illuminated, a book series by Tim Roughgarden
 
 ### Sort
    1. [merge sort](./src/sort/merge.rs)
+   2. [heap sort](./src/sort/heap.rs)
 
 ### Graph
 graphs are represented with adjancency list, currently (with two usize Vecs in Rust)
