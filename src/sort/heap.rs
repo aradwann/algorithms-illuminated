@@ -54,8 +54,8 @@ pub fn get_median(arr: Vec<i32>) -> f64 {
             max_heap.push(min_heap.pop().unwrap().0);
         }
     }
-    println!("{:#?} {:#?}", max_heap, min_heap);
 
+    // return median
     if max_heap.len() > min_heap.len() {
         *max_heap.peek().unwrap() as f64
     } else if max_heap.len() < min_heap.len() {
