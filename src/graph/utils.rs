@@ -47,23 +47,21 @@ pub fn build_graph_rc_from_txt(path: &str) -> DirectedGraphRc {
 ///
 /// each tuple represents an edge (tail, head)
 fn extract_edges(contents: String) -> Vec<(u32, u32)> {
-    // make a Vec of tuples describing edges
-    let edges_tuple_vec: Vec<(u32, u32)> = contents
+    contents
         .lines()
         .map(|line| {
-            let mut c = line.chars();
+            let mut chars = line.chars();
 
-            let v1 = c.next().unwrap();
+            let v1 = chars.next().unwrap();
+            let _ = chars.next(); // skip the space
+            let v2 = chars.next().unwrap();
 
-            // skip the space between the two numbers
-            c.next();
+            let v1 = v1.to_digit(10).unwrap() - 1;
+            let v2 = v2.to_digit(10).unwrap() - 1;
 
-            let v2 = c.next().unwrap();
-            // subtract as the assignments txt begin is 1 indexed not zero-indexed
-            (v1.to_digit(10).unwrap() - 1, v2.to_digit(10).unwrap() - 1)
+            (v1, v2)
         })
-        .collect();
-    edges_tuple_vec
+        .collect()
 }
 
 #[cfg(test)]

@@ -289,6 +289,11 @@ impl DirectedGraphRc {
         self.vertices.as_ref()
     }
 }
+impl Default for DirectedGraphRc {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -397,11 +402,5 @@ mod tests {
         assert_eq!(graph.vertices()[1].borrow().topo_order, Some(3));
         assert_eq!(graph.vertices()[2].borrow().topo_order, Some(2));
         assert_eq!(graph.vertices()[3].borrow().topo_order, Some(4));
-    }
-}
-
-impl Default for DirectedGraphRc {
-    fn default() -> Self {
-        Self::new()
     }
 }

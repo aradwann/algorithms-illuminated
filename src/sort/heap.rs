@@ -1,4 +1,8 @@
-use std::{cmp::Reverse, collections::BinaryHeap, fmt::Debug};
+use std::{
+    cmp::{Ordering, Reverse},
+    collections::BinaryHeap,
+    fmt::Debug,
+};
 
 /// Pseudocode
 /// HeapSort
@@ -38,7 +42,7 @@ pub fn get_median(arr: Vec<i32>) -> f64 {
     let mut max_heap = BinaryHeap::new();
     let mut min_heap = BinaryHeap::new();
 
-    for e in arr.clone() {
+    for e in arr {
         if max_heap.is_empty() || e < *max_heap.peek().unwrap() {
             max_heap.push(e);
         } else {
@@ -56,12 +60,12 @@ pub fn get_median(arr: Vec<i32>) -> f64 {
     }
 
     // return median
-    if max_heap.len() > min_heap.len() {
-        *max_heap.peek().unwrap() as f64
-    } else if max_heap.len() < min_heap.len() {
-        min_heap.peek().unwrap().0 as f64
-    } else {
-        (*max_heap.peek().unwrap() as f64 + min_heap.peek().unwrap().0 as f64) / 2.0
+    match max_heap.len().cmp(&min_heap.len()) {
+        Ordering::Greater => *max_heap.peek().unwrap() as f64,
+        Ordering::Less => min_heap.peek().unwrap().0 as f64,
+        Ordering::Equal => {
+            (*max_heap.peek().unwrap() as f64 + min_heap.peek().unwrap().0 as f64) / 2.0
+        }
     }
 }
 
