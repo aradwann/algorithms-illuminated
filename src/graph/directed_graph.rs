@@ -17,13 +17,19 @@ use std::{
 type VertexRc = Rc<RefCell<Vertex>>;
 type VertexWeak = Weak<RefCell<Vertex>>;
 
-/// named tuple holds the reference to the destination vertex (Rc) and the length of the edge
+///  holds the reference to the destination vertex (Rc) and the length of the edge
 #[derive(Debug)]
-struct OutgoingEdge(VertexRc, Option<usize>);
+struct OutgoingEdge {
+    destination: VertexRc,
+    length: Option<usize>,
+}
 
-/// named tuple holds the reference to the source vertex (Weak) and the length of the edge
+///  holds the reference to the source vertex (Weak) and the length of the edge
 #[derive(Debug)]
-struct IncomingEdge(VertexWeak, Option<usize>);
+struct IncomingEdge {
+    source: VertexWeak,
+    length: Option<usize>,
+}
 
 #[derive(Debug)]
 pub struct Vertex {
@@ -70,12 +76,18 @@ impl DirectedGraph {
 
         let tail = &self.vertices[tail_index];
         let head = &self.vertices[head_index];
-        tail.borrow_mut()
-            .outgoing_edges
-            .push(OutgoingEdge(Rc::clone(head), length));
-        head.borrow_mut()
-            .incoming_edges
-            .push(IncomingEdge(Rc::downgrade(tail), length));
+        tail.borrow_mut().outgoing_edges.push(OutgoingEdge {
+            destination: Rc::clone(head),
+            length,
+        });
+        head.borrow_mut().incoming_edges.push(IncomingEdge {
+            source: Rc::downgrade(tail),
+            length,
+        });
+
+        if self.has_cycle() {
+            panic!("adding this edge would create a cycle")
+        }
     }
 
     /// DFS (recursive version) Pseudocode
@@ -93,8 +105,8 @@ impl DirectedGraph {
         s.borrow_mut().explored = true;
 
         for v in &s.borrow().outgoing_edges {
-            if !v.0.borrow().explored {
-                self.dfs_recursive(&v.0);
+            if !v.destination.borrow().explored {
+                self.dfs_recursive(&v.destination);
             }
         }
     }
@@ -156,8 +168,8 @@ impl DirectedGraph {
         s.borrow_mut().explored = true;
 
         for v in &s.borrow().outgoing_edges {
-            if !v.0.borrow().explored {
-                self.dfs_topo(&v.0, current_label);
+            if !v.destination.borrow().explored {
+                self.dfs_topo(&v.destination, current_label);
             }
         }
 
@@ -178,7 +190,7 @@ impl DirectedGraph {
         // this is the reversed part instead of iterating over the outgoing edges,
         // you iterate over incoming edges
         for v in &s.borrow().incoming_edges {
-            let incoming_edge_tail = v.0.upgrade().unwrap();
+            let incoming_edge_tail = v.source.upgrade().unwrap();
             if !incoming_edge_tail.borrow().explored {
                 self.dfs_topo_reversed(&incoming_edge_tail, current_label);
             }
@@ -247,8 +259,8 @@ impl DirectedGraph {
         s.borrow_mut().scc = Some(*num_scc);
 
         for v in &s.borrow().outgoing_edges {
-            if !v.0.borrow().explored {
-                self.dfs_topo(&v.0, num_scc);
+            if !v.destination.borrow().explored {
+                self.dfs_topo(&v.destination, num_scc);
             }
         }
     }
@@ -272,8 +284,8 @@ impl DirectedGraph {
         s.borrow_mut().scc = Some(*num_scc);
 
         for v in &s.borrow().outgoing_edges {
-            if !v.0.borrow().explored {
-                self.dfs_topo(&v.0, num_scc);
+            if !v.destination.borrow().explored {
+                self.dfs_topo(&v.destination, num_scc);
             }
         }
     }
@@ -287,6 +299,37 @@ impl DirectedGraph {
 
     pub fn vertices(&self) -> &[VertexRc] {
         self.vertices.as_ref()
+    }
+
+    fn has_cycle(&self) -> bool {
+        for vertex in &self.vertices {
+            if self.detect_cycle(vertex, &mut vec![false; self.vertices.len()]) {
+                return true;
+            }
+        }
+        false
+    }
+
+    fn detect_cycle(&self, vertex: &VertexRc, visited: &mut Vec<bool>) -> bool {
+        let vertex_index = self.get_vertex_index(vertex);
+        if visited[vertex_index] {
+            return true;
+        }
+        visited[vertex_index] = true;
+        for edge in &vertex.borrow().outgoing_edges {
+            if self.detect_cycle(&edge.destination, visited) {
+                return true;
+            }
+        }
+        visited[vertex_index] = false;
+        false
+    }
+
+    fn get_vertex_index(&self, vertex: &VertexRc) -> usize {
+        self.vertices
+            .iter()
+            .position(|v| Rc::ptr_eq(v, vertex))
+            .unwrap()
     }
 }
 impl Default for DirectedGraph {
@@ -321,6 +364,42 @@ mod tests {
         let graph = create_simple_graph();
         graph.add_edge(1, 1, None);
     }
+
+    #[test]
+    #[should_panic(expected = "adding this edge would create a cycle")]
+    fn test_add_edge_cyclic_graph() {
+        let mut graph = DirectedGraph::new();
+        graph.add_vertex('A');
+        graph.add_vertex('B');
+        graph.add_vertex('C');
+
+        // Add edges to create a cycle: A -> B -> C -> A
+        graph.add_edge(0, 1, None);
+        graph.add_edge(1, 2, None);
+        graph.add_edge(2, 0, None);
+    }
+
+    // #[test]
+    // fn test_has_cycle() {
+    //     let mut graph = DirectedGraph::new();
+    //     graph.add_vertex('A');
+    //     graph.add_vertex('B');
+    //     graph.add_vertex('C');
+    //     graph.add_vertex('D');
+
+    //     // Add edges to create a cycle: A -> B -> C -> D -> B
+    //     graph.add_edge(0, 1, None);
+    //     graph.add_edge(1, 2, None);
+    //     graph.add_edge(2, 3, None);
+    //     graph.add_edge(3, 1, None);
+
+    //     assert!(graph.has_cycle());
+
+    //     // Remove the cycle by removing the edge D -> B
+    //     graph.vertices[3].borrow_mut().outgoing_edges.pop();
+
+    //     assert!(!graph.has_cycle());
+    // }
 
     // #[test]
     // #[should_panic(expected = "parallel edges aren't allowed atm")]
