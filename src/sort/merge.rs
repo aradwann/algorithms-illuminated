@@ -44,10 +44,10 @@ where
     T: Ord + Copy,
 {
     let len = left_arr.len();
-    let mut merged_vec = vec![];
+    let mut merged_vec = Vec::with_capacity(len);
     let mut i = 0;
     let mut j = 0;
-    // TODO: refactor
+
     while i < len && j < len {
         if left_arr[i] < right_arr[j] {
             merged_vec.push(left_arr[i]);
@@ -57,17 +57,17 @@ where
             j += 1;
         }
     }
-    if i >= len {
-        while j < len {
-            merged_vec.push(right_arr[j]);
-            j += 1;
-        }
-    } else {
-        while i < len {
-            merged_vec.push(left_arr[i]);
-            i += 1;
-        }
+
+    while i < len {
+        merged_vec.push(left_arr[i]);
+        i += 1;
     }
+
+    while j < len {
+        merged_vec.push(right_arr[j]);
+        j += 1;
+    }
+
     merged_vec
 }
 

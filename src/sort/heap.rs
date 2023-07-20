@@ -21,19 +21,17 @@ where
     T: Ord + Clone + Debug,
 {
     let mut heap = BinaryHeap::new();
-    let mut b = Vec::with_capacity(arr.len());
+    let mut sorted_vec = Vec::with_capacity(arr.len());
 
-    for e in arr.clone() {
-        // rust heap is max heap by default
-        // Wrap values in `Reverse` to make it min heap
+    for e in arr {
         heap.push(Reverse(e));
     }
 
-    for _ in 0..(arr.len()) {
-        b.push(heap.pop().unwrap().0);
+    while let Some(Reverse(e)) = heap.pop() {
+        sorted_vec.push(e);
     }
 
-    b
+    sorted_vec
 }
 
 /// solves the median maintenance problem using heap data structure
