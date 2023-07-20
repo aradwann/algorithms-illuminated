@@ -104,9 +104,9 @@ impl DirectedGraph {
         println!("exploring {:#?}", s.borrow().value);
         s.borrow_mut().explored = true;
 
-        for v in &s.borrow().outgoing_edges {
-            if !v.destination.borrow().explored {
-                self.dfs_recursive(&v.destination);
+        for edge in &s.borrow().outgoing_edges {
+            if !edge.destination.borrow().explored {
+                self.dfs_recursive(&edge.destination);
             }
         }
     }
@@ -133,7 +133,6 @@ impl DirectedGraph {
     }
 
     fn topo_sort_reversed(&mut self) {
-        // self.mark_all_vertices_unexplored();
         let vertices = &self.vertices;
         let mut current_label = vertices.len();
 
@@ -143,10 +142,9 @@ impl DirectedGraph {
             }
         }
 
-        // sort graph vertices according to their increasing of their postions
-        let mut sorted_vertices = Vec::with_capacity(vertices.len());
+        let mut sorted_vertices = vec![Rc::new(RefCell::new(Vertex::new(' '))); vertices.len()];
         for v in vertices {
-            sorted_vertices[v.borrow().topo_order.unwrap() - 1] = v.clone();
+            sorted_vertices[v.borrow().topo_order.unwrap() - 1] = Rc::clone(v);
         }
         self.vertices = sorted_vertices;
     }
@@ -162,46 +160,37 @@ impl DirectedGraph {
     ///         DFS-Topo(G,v)
     /// f(s) := curLabel    // s's position in ordering
     /// curLabel := curLabel -1 // work right-to-left
-    fn dfs_topo(&self, s: &VertexRc, current_label: &mut usize) {
-        // vertices must be marked unexplored before calling this function
+    fn dfs_topo(&self, vertex: &VertexRc, current_label: &mut usize) {
+        vertex.borrow_mut().explored = true;
 
-        s.borrow_mut().explored = true;
-
-        for v in &s.borrow().outgoing_edges {
-            if !v.destination.borrow().explored {
-                self.dfs_topo(&v.destination, current_label);
+        for edge in &vertex.borrow().outgoing_edges {
+            let destination = &edge.destination;
+            if !destination.borrow().explored {
+                self.dfs_topo(destination, current_label);
             }
         }
 
-        s.borrow_mut().topo_order = Some(*current_label);
+        vertex.borrow_mut().topo_order = Some(*current_label);
         *current_label -= 1;
-        println!(
-            "vertex index is {} and its topo order is {} ",
-            s.borrow().value,
-            s.borrow().topo_order.unwrap()
-        );
     }
 
-    fn dfs_topo_reversed(&self, s: &VertexRc, current_label: &mut usize) {
-        // vertices must be marked unexplored before calling this function
+    fn dfs_topo_reversed(&self, vertex: &VertexRc, current_label: &mut usize) {
+        vertex.borrow_mut().explored = true;
 
-        s.borrow_mut().explored = true;
-
-        // this is the reversed part instead of iterating over the outgoing edges,
-        // you iterate over incoming edges
-        for v in &s.borrow().incoming_edges {
-            let incoming_edge_tail = v.source.upgrade().unwrap();
-            if !incoming_edge_tail.borrow().explored {
-                self.dfs_topo_reversed(&incoming_edge_tail, current_label);
+        for incoming_edge in &vertex.borrow().incoming_edges {
+            if let Some(incoming_edge_tail) = incoming_edge.source.upgrade() {
+                if !incoming_edge_tail.borrow().explored {
+                    self.dfs_topo_reversed(&incoming_edge_tail, current_label);
+                }
             }
         }
 
-        s.borrow_mut().topo_order = Some(*current_label);
+        vertex.borrow_mut().topo_order = Some(*current_label);
         *current_label -= 1;
         println!(
-            "vertex index is {} and its topo order is {} ",
-            s.borrow().value,
-            s.borrow().topo_order.unwrap()
+            "vertex index is {} and its topo order is {}",
+            vertex.borrow().value,
+            vertex.borrow().topo_order.unwrap()
         );
     }
 
@@ -227,11 +216,7 @@ impl DirectedGraph {
     ///
     pub fn kosaraju(&mut self) -> usize {
         self.mark_all_vertices_unexplored();
-
-        // first dfs pass
         self.topo_sort_reversed();
-        // second dfs pass
-
         self.mark_all_vertices_unexplored();
         let mut num_scc: usize = 0;
 
@@ -241,6 +226,7 @@ impl DirectedGraph {
                 self.dfs_scc(v, &mut num_scc);
             }
         }
+
         num_scc
     }
 
@@ -254,13 +240,13 @@ impl DirectedGraph {
     ///     if v is unexplored then
     ///         DFS-SCC (G,v)
     ///
-    fn dfs_scc(&self, s: &VertexRc, num_scc: &mut usize) {
-        s.borrow_mut().explored = true;
-        s.borrow_mut().scc = Some(*num_scc);
+    fn dfs_scc(&self, vertex: &VertexRc, num_scc: &mut usize) {
+        vertex.borrow_mut().explored = true;
+        vertex.borrow_mut().scc = Some(*num_scc);
 
-        for v in &s.borrow().outgoing_edges {
-            if !v.destination.borrow().explored {
-                self.dfs_topo(&v.destination, num_scc);
+        for outgoing_edge in &vertex.borrow().outgoing_edges {
+            if !outgoing_edge.destination.borrow().explored {
+                self.dfs_scc(&outgoing_edge.destination, num_scc);
             }
         }
     }
@@ -279,7 +265,7 @@ impl DirectedGraph {
     ///     (v*,w*) := such an edge minimizing len(v) + lvw
     ///     add w* to X
     ///     len(w*) := len(v*) + lv*w*
-    fn dijkstra(&self, s: &VertexRc, num_scc: &mut usize) {
+    pub fn dijkstra(&self, s: &VertexRc, num_scc: &mut usize) {
         s.borrow_mut().explored = true;
         s.borrow_mut().scc = Some(*num_scc);
 
