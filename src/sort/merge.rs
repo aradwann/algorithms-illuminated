@@ -23,72 +23,112 @@
 ///         B[k] := D[j]
 ///         j := j + 1
 ///
-pub fn merge_sort<T>(arr: Vec<T>) -> Vec<T>
+pub fn merge_sort<T>(arr: &mut [T])
 where
     T: Ord + Copy,
 {
-    let len = arr.len();
-    if len <= 1 {
-        return arr;
+    let mid = arr.len() / 2;
+    if mid == 0 {
+        return;
     }
 
-    let (first_half, second_half) = arr.split_at(len / 2);
+    merge_sort(&mut arr[..mid]);
+    merge_sort(&mut arr[mid..]);
 
-    let sorted_left_arr = merge_sort(first_half.into());
-    let sorted_right_arr = merge_sort(second_half.into());
-    merge(sorted_left_arr, sorted_right_arr)
+    let mut ret = arr.to_vec();
+
+    merge(&arr[..mid], &arr[mid..], &mut ret[..]);
+
+    arr.copy_from_slice(&ret);
 }
 
-fn merge<T>(left_arr: Vec<T>, right_arr: Vec<T>) -> Vec<T>
+fn merge<T>(left: &[T], right: &[T], ret: &mut [T])
 where
     T: Ord + Copy,
 {
-    let len = left_arr.len();
-    let mut merged_vec = Vec::with_capacity(len);
-    let mut i = 0;
-    let mut j = 0;
+    let mut left_cursor = 0;
+    let mut right_cursor = 0;
+    let mut ret_cursor = 0;
 
-    while i < len && j < len {
-        if left_arr[i] < right_arr[j] {
-            merged_vec.push(left_arr[i]);
-            i += 1;
+    while left_cursor < left.len() && right_cursor < right.len() {
+        if left[left_cursor] <= right[right_cursor] {
+            ret[ret_cursor] = left[left_cursor];
+            left_cursor += 1;
         } else {
-            merged_vec.push(right_arr[j]);
-            j += 1;
+            ret[ret_cursor] = right[right_cursor];
+            right_cursor += 1;
         }
+        ret_cursor += 1;
     }
 
-    while i < len {
-        merged_vec.push(left_arr[i]);
-        i += 1;
+    if left_cursor < left.len() {
+        ret[ret_cursor..].copy_from_slice(&left[left_cursor..]);
     }
 
-    while j < len {
-        merged_vec.push(right_arr[j]);
-        j += 1;
+    if right_cursor < right.len() {
+        ret[ret_cursor..].copy_from_slice(&right[right_cursor..]);
     }
-
-    merged_vec
 }
 
 #[cfg(test)]
 mod tests {
+    // Import necessary items from the outer scope
     use super::*;
 
     #[test]
-    fn test_merge_sort() {
-        let vec = vec![7, 3, 4, 5];
-        let result_vec = merge_sort(vec);
-        let merged_vec = vec![3, 4, 5, 7];
-        assert_eq!(result_vec, merged_vec)
+    fn test_merge_empty_arrays() {
+        let left = [];
+        let right = [];
+        let mut ret = [0; 0];
+
+        merge(&left, &right, &mut ret);
+        assert_eq!(ret, []);
     }
 
     #[test]
-    fn test_merge() {
-        let left_arr = vec![3, 5];
-        let right_arr = vec![4, 7];
-        let result_vec = merge(left_arr, right_arr);
-        let merged_vec = vec![3, 4, 5, 7];
-        assert_eq!(result_vec, merged_vec)
+    fn test_merge_one_empty_array() {
+        let left = [1, 3, 5];
+        let right = [];
+        let mut ret = [0; 3];
+
+        merge(&left, &right, &mut ret);
+        assert_eq!(ret, [1, 3, 5]);
+
+        let left = [];
+        let right = [2, 4, 6];
+        let mut ret = [0; 3];
+
+        merge(&left, &right, &mut ret);
+        assert_eq!(ret, [2, 4, 6]);
+    }
+
+    #[test]
+    fn test_merge_sorted_arrays() {
+        let left = [1, 3, 5];
+        let right = [2, 4, 6];
+        let mut ret = [0; 6];
+
+        merge(&left, &right, &mut ret);
+        assert_eq!(ret, [1, 2, 3, 4, 5, 6]);
+    }
+
+    #[test]
+    fn test_merge_unsorted_arrays() {
+        let left = [5, 3, 1];
+        let right = [6, 4, 2];
+        let mut ret = [0; 6];
+
+        merge(&left, &right, &mut ret);
+        assert_eq!(ret, [5, 3, 1, 6, 4, 2]);
+    }
+
+    #[test]
+    fn test_merge_arrays_with_duplicates() {
+        let left = [1, 3, 5, 5];
+        let right = [2, 4, 6, 6];
+        let mut ret = [0; 8];
+
+        merge(&left, &right, &mut ret);
+        assert_eq!(ret, [1, 2, 3, 4, 5, 5, 6, 6]);
     }
 }
