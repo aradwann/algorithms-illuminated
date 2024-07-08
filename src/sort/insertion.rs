@@ -17,13 +17,13 @@ where
 
     for i in 1..len {
         let key = array[i];
-        let mut j = i as i32 - 1;
+        let mut j = i;
 
-        while j >= 0 && array[j as usize] > key {
-            array[(j + 1) as usize] = array[j as usize];
+        while j > 0 && array[j - 1] > key {
+            array[j] = array[j - 1];
             j -= 1;
         }
 
-        array[(j + 1) as usize] = key;
+        array[j] = key;
     }
 }
