@@ -1,9 +1,9 @@
 # clrs
-![Rust workflow](https://github.com/aradwann/clrs/actions/workflows/rust.yml/badge.svg)
+![Rust workflow](https://github.com/aradwann/algorithms-illuminated/actions/workflows/rust.yml/badge.svg)
 
 my notes and implementation (in rust) of some algorithms in:
 
-CLRS 
+[Algorithms Illuminated](https://www.algorithmsilluminated.org/) 
 
 ### Sort
    1. [merge sort](./src/sort/merge.rs)

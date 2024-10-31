@@ -170,6 +170,12 @@ impl UndirectedGraph {
     }
 }
 
+impl Default for UndirectedGraph {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -216,11 +222,5 @@ mod tests {
         assert_eq!(graph.edges.len(), 8);
         // assert graph has 6 edges
         assert_eq!(graph.vertices.len(), 6);
-    }
-}
-
-impl Default for UndirectedGraph {
-    fn default() -> Self {
-        Self::new()
     }
 }
