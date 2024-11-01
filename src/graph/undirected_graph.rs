@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::collections::{HashSet, VecDeque};
 
 /// representing a graph using an adjacency list which is
 /// 1) An array containing the graph vertices
@@ -8,29 +8,19 @@ use std::collections::VecDeque;
 
 type VertexIndex = usize;
 
+/// Represents data associated with each vertex
 #[derive(Debug, Clone)]
 struct VertexData {
-    edges: Vec<EdgeIndex>,
-    value: char,
-    explored: bool,
-    cc_value: usize,
+    neighbors: HashSet<VertexIndex>,
+    _value: char,
+    cc_value: Option<usize>,
 }
-
-type EdgeIndex = usize;
-
-#[derive(Debug)]
-struct EdgeData(VertexIndex, VertexIndex);
-impl EdgeData {
-    fn new(tail: VertexIndex, head: VertexIndex) -> Self {
-        if tail == head {
-            panic!("self-loops aren't allowed atm")
-        }
-        // order of vertices does not matter as it is undirected
-        // so i order it that it begins always with the smaller
-        if tail > head {
-            Self(head, tail)
-        } else {
-            Self(tail, head)
+impl VertexData {
+    fn new(value: char) -> Self {
+        VertexData {
+            neighbors: HashSet::new(),
+            _value: value,
+            cc_value: None,
         }
     }
 }
@@ -38,40 +28,28 @@ impl EdgeData {
 #[derive(Debug)]
 pub struct UndirectedGraph {
     vertices: Vec<VertexData>,
-    edges: Vec<EdgeData>,
 }
+
 impl UndirectedGraph {
     pub fn new() -> Self {
-        UndirectedGraph {
-            vertices: vec![],
-            edges: vec![],
-        }
+        UndirectedGraph { vertices: vec![] }
     }
     pub fn add_vertex(&mut self, value: char) -> VertexIndex {
         let index = self.vertices.len();
-        self.vertices.push(VertexData {
-            edges: vec![],
-            value,
-            explored: false,
-            cc_value: 0, // 0 means no cc value yet
-        });
+        self.vertices.push(VertexData::new(value));
         index
     }
-    pub fn add_edge(&mut self, tail: VertexIndex, head: VertexIndex) -> EdgeIndex {
-        for e in &self.edges {
-            if e.0 == tail && e.1 == head {
-                panic!("parallel edges aren't allowed atm")
-            }
+    pub fn add_edge(&mut self, v1: VertexIndex, v2: VertexIndex) -> Result<(), &str> {
+        if v1 == v2 {
+            return Err("Self-loops are not allowed");
         }
-        let edge_index = self.edges.len();
-        self.edges.push(EdgeData::new(tail, head));
+        if self.vertices[v1].neighbors.contains(&v2) {
+            return Err("Parallel edges are not allowed");
+        }
 
-        let vertex_data_1 = &mut self.vertices[tail];
-        vertex_data_1.edges.push(edge_index);
-
-        let vertex_data_2 = &mut self.vertices[head];
-        vertex_data_2.edges.push(edge_index);
-        edge_index
+        self.vertices[v1].neighbors.insert(v2);
+        self.vertices[v2].neighbors.insert(v1);
+        Ok(())
     }
 
     /// Pseudocode
@@ -86,26 +64,24 @@ impl UndirectedGraph {
     ///         if w is unexplored then
     ///         mark w as explored
     ///         add w to the end of Q
-    pub fn bfs(&mut self, _value: char) {
-        self.mark_all_vertices_unexplored();
+    pub fn bfs(&mut self, start_vertex: VertexIndex) {
+        self.clear_exploration();
+
         let mut queue = VecDeque::new();
-        queue.push_back(self.edges[0].0); // push the first vertex data into the queue
-        while !queue.is_empty() {
-            let vertex_index = queue.pop_front().unwrap(); // the index of the vertex
-            let vertex_data = self.vertices[vertex_index].clone();
-            for edge_index in vertex_data.edges {
-                let EdgeData(_, vertex_index_2) = self.edges[edge_index];
-                let vertex_2 = &mut self.vertices[vertex_index_2];
-                if !vertex_2.explored {
-                    vertex_2.explored = true;
-                    println!("exploring Vertex {:#?}", &vertex_2);
-                    queue.push_back(vertex_index_2);
+        queue.push_back(start_vertex);
+        self.vertices[start_vertex].cc_value = Some(1);
+
+        while let Some(v_index) = queue.pop_front() {
+            // Clone neighbors to avoid borrowing issues
+            let neighbors = self.vertices[v_index].neighbors.clone();
+            for neighbor_index in neighbors {
+                if self.vertices[neighbor_index].cc_value.is_none() {
+                    self.vertices[neighbor_index].cc_value = Some(1);
+                    println!("Exploring Vertex {:?}", self.vertices[neighbor_index]);
+                    queue.push_back(neighbor_index);
                 }
             }
         }
-    }
-    fn mark_all_vertices_unexplored(&mut self) {
-        self.vertices.iter_mut().for_each(|n| n.explored = false);
     }
 
     /// Pseudocode
@@ -127,25 +103,24 @@ impl UndirectedGraph {
     ///                 mark w as explored
     ///                 add w to the end of Q
     pub fn ucc(&mut self) {
-        self.mark_all_vertices_unexplored();
-        let mut num_cc = 0;
-        for i in 0..self.vertices.len() {
-            if !self.vertices[i].explored {
-                num_cc += 1;
-                let mut queue = VecDeque::new();
-                queue.push_back(i); // push the first vertex index into the queue
-                while !queue.is_empty() {
-                    let vertex_index = queue.pop_front().unwrap(); // the index of the vertex
-                    let vertex_data = self.vertices[vertex_index].clone();
+        self.clear_exploration();
+        let mut component_count = 0;
 
-                    self.vertices[vertex_index].cc_value = num_cc;
-                    for edge_index in vertex_data.edges {
-                        let EdgeData(_, vertex_index_2) = self.edges[edge_index];
-                        let vertex_2 = &mut self.vertices[vertex_index_2];
-                        if !vertex_2.explored {
-                            vertex_2.explored = true;
-                            println!("exploring vertex {:#?}", &vertex_2);
-                            queue.push_back(vertex_index_2);
+        for i in 0..self.vertices.len() {
+            if self.vertices[i].cc_value.is_none() {
+                component_count += 1;
+                let mut queue = VecDeque::new();
+                queue.push_back(i);
+                self.vertices[i].cc_value = Some(component_count);
+
+                while let Some(v_index) = queue.pop_front() {
+                    // Clone neighbors to avoid borrowing issues
+                    let neighbors = self.vertices[v_index].neighbors.clone();
+                    for neighbor_index in neighbors {
+                        if self.vertices[neighbor_index].cc_value.is_none() {
+                            self.vertices[neighbor_index].cc_value = Some(component_count);
+                            println!("Exploring vertex {:?}", self.vertices[neighbor_index]);
+                            queue.push_back(neighbor_index);
                         }
                     }
                 }
@@ -168,6 +143,10 @@ impl UndirectedGraph {
     pub fn dfs_iterative() {
         unimplemented!()
     }
+
+    fn clear_exploration(&mut self) {
+        self.vertices.iter_mut().for_each(|v| v.cc_value = None);
+    }
 }
 
 impl Default for UndirectedGraph {
@@ -181,46 +160,70 @@ mod tests {
     use super::*;
 
     #[test]
-    #[should_panic(expected = "self-loops aren't allowed atm")]
-    fn test_create_self_loop() {
-        EdgeData::new(2, 2);
+    fn test_no_self_loops() {
+        let mut graph = UndirectedGraph::new();
+        let v = graph.add_vertex('A');
+        assert!(graph.add_edge(v, v).is_err());
     }
 
     #[test]
-    #[should_panic(expected = "parallel edges aren't allowed atm")]
-    fn test_add_parallel_edge() {
+    fn test_no_parallel_edges() {
         let mut graph = UndirectedGraph::new();
-
-        graph.add_vertex('s');
-        graph.add_vertex('a');
-
-        graph.add_edge(0, 1);
-        graph.add_edge(0, 1);
+        let v1 = graph.add_vertex('A');
+        let v2 = graph.add_vertex('B');
+        assert!(graph.add_edge(v1, v2).is_ok());
+        assert!(graph.add_edge(v1, v2).is_err());
     }
 
     #[test]
     fn test_create_undirected_graph() {
         let mut graph = UndirectedGraph::new();
 
-        graph.add_vertex('s');
-        graph.add_vertex('a');
-        graph.add_vertex('b');
-        graph.add_vertex('c');
-        graph.add_vertex('d');
-        graph.add_vertex('e');
+        // Adding vertices
+        let v_s = graph.add_vertex('s');
+        let v_a = graph.add_vertex('a');
+        let v_b = graph.add_vertex('b');
+        let v_c = graph.add_vertex('c');
+        let v_d = graph.add_vertex('d');
+        let v_e = graph.add_vertex('e');
 
-        graph.add_edge(0, 1);
-        graph.add_edge(0, 2);
-        graph.add_edge(1, 3);
-        graph.add_edge(2, 3);
-        graph.add_edge(2, 4);
-        graph.add_edge(3, 4);
-        graph.add_edge(3, 5);
-        graph.add_edge(4, 5);
+        // Adding edges
+        graph.add_edge(v_s, v_a).unwrap();
+        graph.add_edge(v_s, v_b).unwrap();
+        graph.add_edge(v_a, v_c).unwrap();
+        graph.add_edge(v_b, v_c).unwrap();
+        graph.add_edge(v_b, v_d).unwrap();
+        graph.add_edge(v_c, v_d).unwrap();
+        graph.add_edge(v_c, v_e).unwrap();
+        graph.add_edge(v_d, v_e).unwrap();
 
-        // assert graph has 8 vertices
-        assert_eq!(graph.edges.len(), 8);
-        // assert graph has 6 edges
+        // Assert vertices count
         assert_eq!(graph.vertices.len(), 6);
+
+        // Assert adjacency relationships
+        assert!(graph.vertices[v_s].neighbors.contains(&v_a));
+        assert!(graph.vertices[v_s].neighbors.contains(&v_b));
+        assert!(graph.vertices[v_a].neighbors.contains(&v_c));
+        assert!(graph.vertices[v_b].neighbors.contains(&v_c));
+        assert!(graph.vertices[v_b].neighbors.contains(&v_d));
+        assert!(graph.vertices[v_c].neighbors.contains(&v_d));
+        assert!(graph.vertices[v_c].neighbors.contains(&v_e));
+        assert!(graph.vertices[v_d].neighbors.contains(&v_e));
+
+        // Test BFS from 's'
+        graph.bfs(v_s);
+        for vertex in &graph.vertices {
+            assert_eq!(vertex.cc_value, Some(1)); // All vertices should be reachable from 's'
+        }
+
+        // Reset graph and test UCC (connected components)
+        graph.clear_exploration();
+        graph.ucc();
+
+        // All vertices should belong to the same connected component
+        let cc_value = graph.vertices[v_s].cc_value.unwrap();
+        for vertex in &graph.vertices {
+            assert_eq!(vertex.cc_value, Some(cc_value));
+        }
     }
 }
