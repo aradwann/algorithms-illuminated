@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod tests {
 
-    use clrs::sort::insertion_sort;
-    use clrs::sort::merge_sort;
+    use algorithms_illuminated::sort::insertion_sort;
+    use algorithms_illuminated::sort::merge_sort;
 
     #[test]
     fn test_merge_sort() {
