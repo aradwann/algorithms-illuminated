@@ -32,7 +32,7 @@ struct IncomingEdge {
 }
 
 #[derive(Debug)]
-pub struct Vertex {
+struct Vertex {
     outgoing_edges: Vec<OutgoingEdge>,
     incoming_edges: Vec<IncomingEdge>,
     value: char,
