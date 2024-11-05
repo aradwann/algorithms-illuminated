@@ -13,6 +13,7 @@ pub enum GraphError {
 pub struct Vertex {
     pub value: char,
     pub edges: HashSet<VertexIndex>,
+    pub explored: bool,
 }
 
 impl Vertex {
@@ -20,10 +21,11 @@ impl Vertex {
         Self {
             value,
             edges: HashSet::new(),
+            explored: false,
         }
     }
 }
-pub(crate) trait Graph {
+pub trait Graph {
     fn add_vertex(&mut self, index: VertexIndex, value: char) -> VertexRef;
     fn add_edge(&mut self, from: VertexIndex, to: VertexIndex) -> Result<(), GraphError>;
     fn get_neighbors(&self, index: VertexIndex) -> Vec<VertexIndex>;

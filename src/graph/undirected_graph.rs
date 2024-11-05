@@ -1,9 +1,10 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     sync::{Arc, Mutex},
 };
 
 use super::{Graph, GraphError, Vertex, VertexIndex, VertexRef};
+use std::collections::VecDeque;
 
 /// representing a graph using an adjacency list which is
 /// 1) An array containing the graph vertices
@@ -11,7 +12,7 @@ use super::{Graph, GraphError, Vertex, VertexIndex, VertexRef};
 /// 3) For each edge, a pointer to each of its two endpoints
 /// 4) for each vertex, a pointer to each of the incident edges
 
-struct UndirectedGraph {
+pub struct UndirectedGraph {
     vertices: HashMap<VertexIndex, VertexRef>,
 }
 impl Graph for UndirectedGraph {
@@ -63,7 +64,7 @@ impl Graph for UndirectedGraph {
 }
 
 impl UndirectedGraph {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             vertices: HashMap::new(),
         }
@@ -80,8 +81,28 @@ impl UndirectedGraph {
     ///         if w is unexplored then
     ///         mark w as explored
     ///         add w to the end of Q
-    pub fn bfs(&mut self, _start_vertex: VertexIndex) {
-        unimplemented!()
+    pub fn bfs(&self, start: VertexIndex) -> Vec<VertexIndex> {
+        let mut visited = HashSet::new();
+        let mut queue = VecDeque::new();
+        let mut bfs_order = Vec::new();
+
+        queue.push_back(start);
+        visited.insert(start);
+
+        while let Some(current) = queue.pop_front() {
+            bfs_order.push(current);
+
+            if let Some(vertex) = self.vertices.get(&current) {
+                for &neighbor in &vertex.lock().unwrap().edges {
+                    if !visited.contains(&neighbor) {
+                        visited.insert(neighbor);
+                        queue.push_back(neighbor);
+                    }
+                }
+            }
+        }
+
+        bfs_order
     }
 
     /// Pseudocode
@@ -122,8 +143,8 @@ impl UndirectedGraph {
         unimplemented!()
     }
 
-    fn clear_exploration(&mut self) {
-        unimplemented!()
+    pub fn vertices(&self) -> &HashMap<VertexIndex, VertexRef> {
+        &self.vertices
     }
 }
 
@@ -224,5 +245,54 @@ mod tests {
         // Confirm edges are correct
         assert_eq!(graph.get_neighbors(1), vec![2]);
         assert_eq!(graph.get_neighbors(2), vec![1]);
+    }
+    #[test]
+    fn test_bfs_traversal() {
+        let mut graph = UndirectedGraph::new();
+
+        // Adding vertices
+        graph.add_vertex(1, 'A');
+        graph.add_vertex(2, 'B');
+        graph.add_vertex(3, 'C');
+        graph.add_vertex(4, 'D');
+        graph.add_vertex(5, 'E');
+
+        // Adding edges
+        let _ = graph.add_edge(1, 2);
+        let _ = graph.add_edge(1, 3);
+        let _ = graph.add_edge(2, 4);
+        let _ = graph.add_edge(3, 5);
+
+        // Performing BFS traversal from vertex 1
+        let bfs_result = graph.bfs(1);
+
+        // Expected order of traversal
+        let expected_order = vec![1, 2, 3, 4, 5];
+
+        // Check if the BFS result matches the expected order
+        assert_eq!(bfs_result, expected_order);
+    }
+
+    #[test]
+    fn test_bfs_traversal_disconnected_graph() {
+        let mut graph = UndirectedGraph::new();
+
+        // Adding vertices
+        graph.add_vertex(1, 'A');
+        graph.add_vertex(2, 'B');
+        graph.add_vertex(3, 'C');
+        graph.add_vertex(4, 'D');
+
+        // Adding edges only among some vertices
+        let _ = graph.add_edge(1, 2);
+        let _ = graph.add_edge(2, 3);
+
+        // Performing BFS traversal from vertex 1
+        let bfs_result = graph.bfs(1);
+
+        // Expected order for a disconnected component
+        let expected_order = vec![1, 2, 3];
+
+        assert_eq!(bfs_result, expected_order);
     }
 }
