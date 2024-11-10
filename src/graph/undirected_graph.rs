@@ -195,8 +195,61 @@ impl UndirectedGraph {
     ///         mark v as explored
     ///         for each edge (v,w) in v's adjancency list do
     ///             add("push") w to the front of S
-    pub fn dfs_iterative() {
-        unimplemented!()
+    pub fn dfs_iterative(&self, start: VertexIndex) -> Result<Vec<VertexIndex>, GraphError> {
+        if !self.vertices.contains_key(&start) {
+            return Err(GraphError::VertexNotFound);
+        }
+
+        let mut visited = HashSet::new();
+        let mut stack = Vec::new();
+        let mut dfs_order = Vec::new();
+        stack.push(start);
+
+        while let Some(current) = stack.pop() {
+            if !visited.contains(&current) {
+                visited.insert(current);
+                dfs_order.push(current);
+                for v in self.get_neighbors(current) {
+                    stack.push(v);
+                }
+            }
+        }
+
+        Ok(dfs_order)
+    }
+
+    /// DFS (recursive version) Pseudocode
+    /// Input: graph G= (V, E) in adjancency list representation, and a vertex s ∈ V
+    /// postcondition: a vertex is reachabele from s if and only if it is marked as "explored".
+    /// -------------------------------------------------------------------------------------
+    /// // all vertices unexplored before outer call mark s as explored
+    /// mark s as explored
+    /// for each edge (s,v) in s's adjancency list do
+    ///     if v is unexplored then
+    ///         DFS(G, v)
+    pub fn dfs_recursive(
+        &self,
+        start: VertexIndex,
+        visited_set: &mut HashSet<usize>,
+        dfs_order: &mut Vec<usize>,
+    ) -> Result<Vec<VertexIndex>, GraphError> {
+        // Check if the starting vertex exists in the graph
+        if !self.vertices.contains_key(&start) {
+            return Err(GraphError::VertexNotFound);
+        }
+
+        // Mark the current vertex as visited
+        visited_set.insert(start);
+
+        // Recurse for each unvisited neighbor
+        for neighbor in self.get_neighbors(start) {
+            if !visited_set.contains(&neighbor) {
+                self.dfs_recursive(neighbor, visited_set, dfs_order)?;
+            }
+        }
+
+        dfs_order.push(start);
+        Ok(dfs_order.to_vec())
     }
 }
 
@@ -274,6 +327,63 @@ mod tests {
         let mut bfs_result = graph.bfs(1).unwrap();
         bfs_result.sort(); // sort as bfs orders isn't guranteed to be the same every run
         let expected_order = vec![1, 2, 3, 4, 5];
+        // this test essentially ensures that all vertices are explored
+        assert_eq!(bfs_result, expected_order);
+    }
+
+    #[test]
+    fn test_dfs_iterative_traversal() {
+        let mut graph = UndirectedGraph::new();
+        graph.add_vertex(0, 'S');
+        graph.add_vertex(1, 'A');
+        graph.add_vertex(2, 'B');
+        graph.add_vertex(3, 'C');
+        graph.add_vertex(4, 'D');
+        graph.add_vertex(5, 'E');
+
+        graph.add_edge(0, 1).unwrap();
+        graph.add_edge(0, 2).unwrap();
+        graph.add_edge(1, 3).unwrap();
+        graph.add_edge(2, 3).unwrap();
+        graph.add_edge(2, 4).unwrap();
+        graph.add_edge(3, 4).unwrap();
+        graph.add_edge(3, 5).unwrap();
+
+        let mut bfs_result = graph.dfs_iterative(0).unwrap();
+        bfs_result.sort(); // sort as bfs orders isn't guranteed to be the same every run
+        let expected_order = vec![0, 1, 2, 3, 4, 5];
+        // this test essentially ensures that all vertices are explored
+        assert_eq!(bfs_result, expected_order);
+    }
+    #[test]
+    fn test_dfs_recursive_traversal() {
+        let mut graph = UndirectedGraph::new();
+
+        graph.add_vertex(0, 'S');
+        graph.add_vertex(1, 'A');
+        graph.add_vertex(2, 'B');
+        graph.add_vertex(3, 'C');
+        graph.add_vertex(4, 'D');
+        graph.add_vertex(5, 'E');
+
+        graph.add_edge(0, 1).unwrap();
+        graph.add_edge(0, 2).unwrap();
+        graph.add_edge(1, 3).unwrap();
+        graph.add_edge(2, 3).unwrap();
+        graph.add_edge(2, 4).unwrap();
+        graph.add_edge(3, 4).unwrap();
+        graph.add_edge(3, 5).unwrap();
+
+        let mut visited = HashSet::new();
+        let mut dfs_order = Vec::new();
+
+        let mut bfs_result = graph
+            .dfs_recursive(0, &mut visited, &mut dfs_order)
+            .unwrap();
+
+        bfs_result.sort(); // sort as bfs orders isn't guranteed to be the same every run
+        let expected_order = vec![0, 1, 2, 3, 4, 5];
+        // this test essentially ensures that all vertices are explored
         assert_eq!(bfs_result, expected_order);
     }
 
