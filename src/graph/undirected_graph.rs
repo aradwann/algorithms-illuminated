@@ -70,8 +70,8 @@ impl UndirectedGraph {
     ///         if w is unexplored then
     ///             mark w as explored
     ///             add w to the end of Q
-    pub fn bfs(&self, start: VertexIndex) -> Result<Vec<VertexIndex>,GraphError> {
-        if !self.vertices.contains_key(&start){
+    pub fn bfs(&self, start: VertexIndex) -> Result<Vec<VertexIndex>, GraphError> {
+        if !self.vertices.contains_key(&start) {
             return Err(GraphError::VertexNotFound);
         }
 
@@ -111,8 +111,8 @@ impl UndirectedGraph {
     ///         if w is unexplored then
     ///             mark w as explored
     ///             add w to the end of Q
-    pub fn shortest_path_bfs(&self, start: usize) -> Result<HashMap<usize, usize>,GraphError> {
-        if !self.vertices.contains_key(&start){
+    pub fn shortest_path_bfs(&self, start: usize) -> Result<HashMap<usize, usize>, GraphError> {
+        if !self.vertices.contains_key(&start) {
             return Err(GraphError::VertexNotFound);
         }
         let mut dist = HashMap::new();
@@ -141,7 +141,7 @@ impl UndirectedGraph {
     /// Input: undirected graph G=(V,E) in adjancency list representation with V = {1,2,3,4,...,n}
     /// postcondition: for every u, v ∈ V, cc(u) = cc(v) if and only if u, v are in the same connected graph
     /// -----------------------------------------------------------------------------------
-    /// mark s as explored, all other vertices as unexplored
+    /// mark s vertices as unexplored
     /// numCC := 0
     /// for i := 1 to n do
     ///     if i is unexplored then
@@ -153,10 +153,34 @@ impl UndirectedGraph {
     ///             cc(v) := numCC
     ///             for each edge (v,w) in v's adjacency list do
     ///                 if w is unexplored then
-    ///                 mark w as explored
-    ///                 add w to the end of Q
-    pub fn ucc(&mut self) {
-        unimplemented!()
+    ///                     mark w as explored
+    ///                     add w to the end of Q
+    pub fn ucc(&mut self) -> HashMap<usize, Vec<usize>> {
+        let mut visited = HashSet::new();
+        let mut num_cc: usize = 0;
+        let mut connected_components = HashMap::new();
+        for (&v, _) in self.vertices.iter() {
+            if !visited.contains(&v) {
+                num_cc += 1;
+                let mut queue = VecDeque::new();
+                queue.push_back(v);
+                visited.insert(v);
+
+                while let Some(current) = queue.pop_front() {
+                    let cc_vec = connected_components.entry(num_cc).or_insert_with(Vec::new);
+                    cc_vec.push(current);
+                    if let Some(vertex) = self.vertices.get(&current) {
+                        for &neighbor in &vertex.edges {
+                            if !visited.contains(&neighbor) {
+                                visited.insert(neighbor);
+                                queue.push_back(neighbor);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        connected_components
     }
 
     /// DFS (iterative version) Pseudocode
@@ -218,7 +242,7 @@ mod tests {
         graph.add_vertex(1, 'A');
         graph.add_vertex(2, 'B');
         let _ = graph.add_edge(1, 2);
-        
+
         // Attempt to add a parallel edge
         let result = graph.add_edge(1, 2);
         assert_eq!(result, Err(GraphError::ParallelEdge));
@@ -228,7 +252,7 @@ mod tests {
     fn undirected_graph_add_self_loop() {
         let mut graph = UndirectedGraph::new();
         graph.add_vertex(1, 'A');
-        
+
         // Attempt to add a self-loop
         let result = graph.add_edge(1, 1);
         assert_eq!(result, Err(GraphError::SelfLoop));
@@ -248,7 +272,7 @@ mod tests {
         let _ = graph.add_edge(3, 5);
 
         let mut bfs_result = graph.bfs(1).unwrap();
-        bfs_result.sort(); // sort as bfs orders isn't guranteed to be the same every run 
+        bfs_result.sort(); // sort as bfs orders isn't guranteed to be the same every run
         let expected_order = vec![1, 2, 3, 4, 5];
         assert_eq!(bfs_result, expected_order);
     }
@@ -274,20 +298,19 @@ mod tests {
         let graph = UndirectedGraph::new();
         let bfs_result = graph.bfs(1);
         assert_eq!(bfs_result, Err(GraphError::VertexNotFound));
-
     }
 
     #[test]
     fn test_shortest_path_bfs() {
         let mut graph = UndirectedGraph::new();
-        
+
         graph.add_vertex(0, 'S');
         graph.add_vertex(1, 'A');
         graph.add_vertex(2, 'B');
         graph.add_vertex(3, 'C');
         graph.add_vertex(4, 'D');
         graph.add_vertex(5, 'E');
-        
+
         graph.add_edge(0, 1).unwrap();
         graph.add_edge(0, 2).unwrap();
         graph.add_edge(1, 3).unwrap();
@@ -312,7 +335,7 @@ mod tests {
         graph.add_vertex(0, 'A');
         graph.add_vertex(1, 'B');
         graph.add_vertex(2, 'C');
-        
+
         let shortest_paths = graph.shortest_path_bfs(0).unwrap();
 
         // Only vertex 0 should have a distance of 0, others should not be reachable
@@ -324,17 +347,17 @@ mod tests {
     #[test]
     fn test_disconnected_graph_shortest_path_bfs() {
         let mut graph = UndirectedGraph::new();
-        
+
         graph.add_vertex(0, 'A');
         graph.add_vertex(1, 'B');
         graph.add_vertex(2, 'C');
         graph.add_vertex(3, 'D');
-        
+
         graph.add_edge(0, 1).unwrap();
         graph.add_edge(2, 3).unwrap();
-        
+
         let shortest_paths = graph.shortest_path_bfs(0).unwrap();
-        
+
         // Expect distances only for vertices connected to 0
         assert_eq!(shortest_paths.get(&0), Some(&0));
         assert_eq!(shortest_paths.get(&1), Some(&1));
@@ -342,5 +365,59 @@ mod tests {
         assert_eq!(shortest_paths.get(&3), None);
     }
 
+    #[test]
+    fn test_ucc() {
+        // example 8.3.4 in the book
+        let mut graph = UndirectedGraph::new();
 
+        graph.add_vertex(0, 'S');
+        graph.add_vertex(1, 'A');
+        graph.add_vertex(2, 'B');
+        graph.add_vertex(3, 'C');
+        graph.add_vertex(4, 'D');
+        graph.add_vertex(5, 'E');
+        graph.add_vertex(6, 'F');
+        graph.add_vertex(7, 'G');
+        graph.add_vertex(8, 'H');
+        graph.add_vertex(9, 'L');
+
+        graph.add_edge(0, 4).unwrap();
+        graph.add_edge(0, 2).unwrap();
+        graph.add_edge(1, 3).unwrap();
+        graph.add_edge(2, 4).unwrap();
+        graph.add_edge(4, 6).unwrap();
+        graph.add_edge(4, 8).unwrap();
+        graph.add_edge(5, 7).unwrap();
+        graph.add_edge(5, 9).unwrap();
+
+        let connected_components = graph.ucc();
+
+        // Define the expected connected components based on the graph structure.
+        // Here, we expect three connected components:
+        // - Component 1: {0, 2, 4, 6, 8}
+        // - Component 2: {1, 3}
+        // - Component 3: {5, 7, 9}
+        let expected_components = vec![vec![0, 2, 4, 6, 8], vec![1, 3], vec![5, 7, 9]];
+
+        // Extract the vectors from the tuples, sort each component, and then sort the outer list
+        let mut sorted_components: Vec<Vec<usize>> = connected_components
+            .into_iter()
+            .map(|(_, mut comp)| {
+                comp.sort_unstable();
+                comp
+            })
+            .collect();
+        sorted_components.sort();
+
+        let mut expected_sorted: Vec<Vec<usize>> = expected_components
+            .into_iter()
+            .map(|mut comp| {
+                comp.sort_unstable();
+                comp
+            })
+            .collect();
+        expected_sorted.sort();
+
+        assert_eq!(sorted_components, expected_sorted);
+    }
 }
