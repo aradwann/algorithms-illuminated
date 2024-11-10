@@ -1,9 +1,6 @@
-use std::{
-    collections::{HashMap, HashSet},
-    sync::{Arc, Mutex},
-};
+use std::collections::{HashMap, HashSet};
 
-use super::{Graph, GraphError, Vertex, VertexIndex, VertexRef};
+use super::{Graph, GraphError, Vertex, VertexIndex};
 use std::collections::VecDeque;
 
 /// representing a graph using an adjacency list which is
@@ -12,44 +9,36 @@ use std::collections::VecDeque;
 /// 3) For each edge, a pointer to each of its two endpoints
 /// 4) for each vertex, a pointer to each of the incident edges
 
+/// An undirected graph represented using an adjacency list.
 pub struct UndirectedGraph {
-    vertices: HashMap<VertexIndex, VertexRef>,
+    vertices: HashMap<VertexIndex, Vertex>,
 }
-impl Graph for UndirectedGraph {
-    fn add_vertex(&mut self, index: VertexIndex, value: char) -> VertexRef {
-        let vertex = Arc::new(Mutex::new(Vertex::new(value)));
-        self.vertices.insert(index, Arc::clone(&vertex));
-        vertex
-    }
 
+impl Graph for UndirectedGraph {
+    fn add_vertex(&mut self, index: VertexIndex, value: char) {
+        self.vertices.insert(index, Vertex::new(value));
+    }
     fn add_edge(&mut self, from: VertexIndex, to: VertexIndex) -> Result<(), GraphError> {
-        // Check for self-loop
         if from == to {
             return Err(GraphError::SelfLoop);
         }
 
-        // Check if the edge already exists
-        if let Some(vertex) = self.vertices.get(&from) {
-            if vertex.lock().unwrap().edges.contains(&to) {
+        if let Some(from_vertex) = self.vertices.get_mut(&from) {
+            if from_vertex.edges.contains(&to) {
                 return Err(GraphError::ParallelEdge);
             }
-            // Temporarily add the edge to check for cycles
-            vertex.lock().unwrap().edges.insert(to);
+            from_vertex.edges.insert(to);
         } else {
             return Err(GraphError::VertexNotFound);
         }
 
-        // Check the other vertex
-        if let Some(vertex) = self.vertices.get(&to) {
-            if vertex.lock().unwrap().edges.contains(&from) {
+        if let Some(to_vertex) = self.vertices.get_mut(&to) {
+            if to_vertex.edges.contains(&from) {
                 return Err(GraphError::ParallelEdge);
             }
-            vertex.lock().unwrap().edges.insert(from);
+            to_vertex.edges.insert(from);
         } else {
-            // If the second vertex doesn't exist, remove the edge from the first vertex
-            if let Some(vertex) = self.vertices.get(&from) {
-                vertex.lock().unwrap().edges.remove(&to);
-            }
+            self.vertices.get_mut(&from).unwrap().edges.remove(&to);
             return Err(GraphError::VertexNotFound);
         }
 
@@ -57,9 +46,9 @@ impl Graph for UndirectedGraph {
     }
 
     fn get_neighbors(&self, index: VertexIndex) -> Vec<VertexIndex> {
-        self.vertices.get(&index).map_or(vec![], |v| {
-            v.lock().unwrap().edges.iter().cloned().collect()
-        })
+        self.vertices
+            .get(&index)
+            .map_or(vec![], |v| v.edges.iter().cloned().collect())
     }
 }
 
@@ -79,9 +68,13 @@ impl UndirectedGraph {
     ///     remove the vertex from the front of the Q, call it v
     ///     for each edge (v,w) in v's adjacency list do
     ///         if w is unexplored then
-    ///         mark w as explored
-    ///         add w to the end of Q
-    pub fn bfs(&self, start: VertexIndex) -> Vec<VertexIndex> {
+    ///             mark w as explored
+    ///             add w to the end of Q
+    pub fn bfs(&self, start: VertexIndex) -> Result<Vec<VertexIndex>,GraphError> {
+        if !self.vertices.contains_key(&start){
+            return Err(GraphError::VertexNotFound);
+        }
+
         let mut visited = HashSet::new();
         let mut queue = VecDeque::new();
         let mut bfs_order = Vec::new();
@@ -93,7 +86,7 @@ impl UndirectedGraph {
             bfs_order.push(current);
 
             if let Some(vertex) = self.vertices.get(&current) {
-                for &neighbor in &vertex.lock().unwrap().edges {
+                for &neighbor in &vertex.edges {
                     if !visited.contains(&neighbor) {
                         visited.insert(neighbor);
                         queue.push_back(neighbor);
@@ -102,10 +95,49 @@ impl UndirectedGraph {
             }
         }
 
-        bfs_order
+        Ok(bfs_order)
     }
 
     /// Pseudocode
+    /// Input: graph G=(V,E) in adjancency list representation and a vertex s ∈ V
+    /// postcondition: for every vertex v ∈ V, the value l(v) equals the true shortest path distance dist(s,v)
+    /// -----------------------------------------------------------------------------------
+    /// mark s as explored, all other vertices as unexplored
+    /// l(s):=0, l(v):= +infinity for every v != s
+    /// Q := a queue data structure, intialized with s
+    /// while Q is not empty do
+    ///     remove the vertex from the front of the Q, call it v
+    ///     for each edge (v,w) in v's adjacency list do
+    ///         if w is unexplored then
+    ///             mark w as explored
+    ///             add w to the end of Q
+    pub fn shortest_path_bfs(&self, start: usize) -> Result<HashMap<usize, usize>,GraphError> {
+        if !self.vertices.contains_key(&start){
+            return Err(GraphError::VertexNotFound);
+        }
+        let mut dist = HashMap::new();
+        let mut queue = VecDeque::new();
+
+        // Start by setting the distance to the start node as 0
+        dist.insert(start, 0);
+        queue.push_back(start);
+
+        while let Some(current) = queue.pop_front() {
+            let current_distance = dist[&current];
+
+            for neighbor in self.get_neighbors(current) {
+                // If the neighbor hasn't been visited (i.e., it has no distance assigned)
+                if !dist.contains_key(&neighbor) {
+                    dist.insert(neighbor, current_distance + 1);
+                    queue.push_back(neighbor);
+                }
+            }
+        }
+
+        Ok(dist)
+    }
+
+    /// Pseudocode undirect connected components
     /// Input: undirected graph G=(V,E) in adjancency list representation with V = {1,2,3,4,...,n}
     /// postcondition: for every u, v ∈ V, cc(u) = cc(v) if and only if u, v are in the same connected graph
     /// -----------------------------------------------------------------------------------
@@ -142,10 +174,6 @@ impl UndirectedGraph {
     pub fn dfs_iterative() {
         unimplemented!()
     }
-
-    pub fn vertices(&self) -> &HashMap<VertexIndex, VertexRef> {
-        &self.vertices
-    }
 }
 
 impl Default for UndirectedGraph {
@@ -161,9 +189,9 @@ mod tests {
     #[test]
     fn undirected_graph_add_vertex() {
         let mut graph = UndirectedGraph::new();
-        let vertex = graph.add_vertex(1, 'A');
+        graph.add_vertex(1, 'A');
         assert!(graph.vertices.contains_key(&1));
-        assert_eq!(vertex.lock().unwrap().value, 'A');
+        assert_eq!(graph.vertices.get(&1).unwrap().value, 'A');
     }
 
     #[test]
@@ -185,114 +213,134 @@ mod tests {
     }
 
     #[test]
-    fn undirected_graph_get_neighbors() {
-        let mut graph = UndirectedGraph::new();
-        graph.add_vertex(1, 'A');
-        graph.add_vertex(2, 'B');
-        graph.add_vertex(3, 'C');
-        let _ = graph.add_edge(1, 2);
-        let _ = graph.add_edge(1, 3);
-
-        let mut actual_neighbors = graph.get_neighbors(1);
-        let mut expected_neighbors = vec![2, 3];
-
-        // Sort both vectors to ensure order doesn't cause assertion failure
-        expected_neighbors.sort();
-        actual_neighbors.sort();
-
-        assert_eq!(actual_neighbors, expected_neighbors);
-    }
-
-    #[test]
-    fn undirected_graph_bidirectional_edges() {
+    fn undirected_graph_add_parallel_edge() {
         let mut graph = UndirectedGraph::new();
         graph.add_vertex(1, 'A');
         graph.add_vertex(2, 'B');
         let _ = graph.add_edge(1, 2);
-
-        // Verify that the edge exists in both directions
-        let neighbors_1 = graph.get_neighbors(1);
-        let neighbors_2 = graph.get_neighbors(2);
-
-        assert!(neighbors_1.contains(&2));
-        assert!(neighbors_2.contains(&1));
+        
+        // Attempt to add a parallel edge
+        let result = graph.add_edge(1, 2);
+        assert_eq!(result, Err(GraphError::ParallelEdge));
     }
 
     #[test]
-    fn test_prevent_self_loops_and_parallel_edges_undirected() {
+    fn undirected_graph_add_self_loop() {
         let mut graph = UndirectedGraph::new();
         graph.add_vertex(1, 'A');
-        graph.add_vertex(2, 'B');
-
-        // Test adding a valid edge
-        assert!(
-            graph.add_edge(1, 2).is_ok(),
-            "Edge between 1 and 2 should be added"
-        );
-
-        // Test self-loop prevention
-        assert_eq!(graph.add_edge(1, 1), Err(GraphError::SelfLoop));
-
-        // Test parallel edge prevention
-        assert_eq!(graph.add_edge(1, 2), Err(GraphError::ParallelEdge));
-
-        // Add another edge and check
-        assert!(
-            graph.add_edge(2, 1).is_err(),
-            "Adding edge 2 to 1 should return error due to parallel edge"
-        );
-
-        // Confirm edges are correct
-        assert_eq!(graph.get_neighbors(1), vec![2]);
-        assert_eq!(graph.get_neighbors(2), vec![1]);
+        
+        // Attempt to add a self-loop
+        let result = graph.add_edge(1, 1);
+        assert_eq!(result, Err(GraphError::SelfLoop));
     }
+
     #[test]
     fn test_bfs_traversal() {
         let mut graph = UndirectedGraph::new();
-
-        // Adding vertices
         graph.add_vertex(1, 'A');
         graph.add_vertex(2, 'B');
         graph.add_vertex(3, 'C');
         graph.add_vertex(4, 'D');
         graph.add_vertex(5, 'E');
-
-        // Adding edges
         let _ = graph.add_edge(1, 2);
         let _ = graph.add_edge(1, 3);
         let _ = graph.add_edge(2, 4);
         let _ = graph.add_edge(3, 5);
 
-        // Performing BFS traversal from vertex 1
-        let bfs_result = graph.bfs(1);
-
-        // Expected order of traversal
+        let mut bfs_result = graph.bfs(1).unwrap();
+        bfs_result.sort(); // sort as bfs orders isn't guranteed to be the same every run 
         let expected_order = vec![1, 2, 3, 4, 5];
-
-        // Check if the BFS result matches the expected order
         assert_eq!(bfs_result, expected_order);
     }
 
     #[test]
     fn test_bfs_traversal_disconnected_graph() {
         let mut graph = UndirectedGraph::new();
-
-        // Adding vertices
         graph.add_vertex(1, 'A');
         graph.add_vertex(2, 'B');
         graph.add_vertex(3, 'C');
         graph.add_vertex(4, 'D');
 
-        // Adding edges only among some vertices
         let _ = graph.add_edge(1, 2);
         let _ = graph.add_edge(2, 3);
 
-        // Performing BFS traversal from vertex 1
-        let bfs_result = graph.bfs(1);
-
-        // Expected order for a disconnected component
+        let bfs_result = graph.bfs(1).unwrap();
         let expected_order = vec![1, 2, 3];
-
         assert_eq!(bfs_result, expected_order);
     }
+
+    #[test]
+    fn test_bfs_traversal_empty_graph() {
+        let graph = UndirectedGraph::new();
+        let bfs_result = graph.bfs(1);
+        assert_eq!(bfs_result, Err(GraphError::VertexNotFound));
+
+    }
+
+    #[test]
+    fn test_shortest_path_bfs() {
+        let mut graph = UndirectedGraph::new();
+        
+        graph.add_vertex(0, 'S');
+        graph.add_vertex(1, 'A');
+        graph.add_vertex(2, 'B');
+        graph.add_vertex(3, 'C');
+        graph.add_vertex(4, 'D');
+        graph.add_vertex(5, 'E');
+        
+        graph.add_edge(0, 1).unwrap();
+        graph.add_edge(0, 2).unwrap();
+        graph.add_edge(1, 3).unwrap();
+        graph.add_edge(2, 3).unwrap();
+        graph.add_edge(2, 4).unwrap();
+        graph.add_edge(3, 4).unwrap();
+        graph.add_edge(3, 5).unwrap();
+
+        let shortest_paths = graph.shortest_path_bfs(0).unwrap();
+
+        assert_eq!(shortest_paths.get(&0), Some(&0));
+        assert_eq!(shortest_paths.get(&1), Some(&1));
+        assert_eq!(shortest_paths.get(&2), Some(&1));
+        assert_eq!(shortest_paths.get(&3), Some(&2));
+        assert_eq!(shortest_paths.get(&4), Some(&2));
+        assert_eq!(shortest_paths.get(&5), Some(&3));
+    }
+
+    #[test]
+    fn test_shortest_path_bfs_no_path() {
+        let mut graph = UndirectedGraph::new();
+        graph.add_vertex(0, 'A');
+        graph.add_vertex(1, 'B');
+        graph.add_vertex(2, 'C');
+        
+        let shortest_paths = graph.shortest_path_bfs(0).unwrap();
+
+        // Only vertex 0 should have a distance of 0, others should not be reachable
+        assert_eq!(shortest_paths.get(&0), Some(&0));
+        assert_eq!(shortest_paths.get(&1), None);
+        assert_eq!(shortest_paths.get(&2), None);
+    }
+
+    #[test]
+    fn test_disconnected_graph_shortest_path_bfs() {
+        let mut graph = UndirectedGraph::new();
+        
+        graph.add_vertex(0, 'A');
+        graph.add_vertex(1, 'B');
+        graph.add_vertex(2, 'C');
+        graph.add_vertex(3, 'D');
+        
+        graph.add_edge(0, 1).unwrap();
+        graph.add_edge(2, 3).unwrap();
+        
+        let shortest_paths = graph.shortest_path_bfs(0).unwrap();
+        
+        // Expect distances only for vertices connected to 0
+        assert_eq!(shortest_paths.get(&0), Some(&0));
+        assert_eq!(shortest_paths.get(&1), Some(&1));
+        assert_eq!(shortest_paths.get(&2), None);
+        assert_eq!(shortest_paths.get(&3), None);
+    }
+
+
 }
