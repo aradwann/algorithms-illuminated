@@ -1,7 +1,22 @@
 use std::collections::{HashMap, HashSet};
 
-use super::{Graph, GraphError, Vertex, VertexIndex};
+use super::{Graph, GraphError, VertexIndex};
 use std::collections::VecDeque;
+
+#[derive(Debug)]
+struct Vertex {
+    pub value: char,
+    pub edges: HashSet<VertexIndex>,
+}
+
+impl Vertex {
+    fn new(value: char) -> Self {
+        Self {
+            value,
+            edges: HashSet::new(),
+        }
+    }
+}
 
 /// representing a graph using an adjacency list which is
 /// 1) An array containing the graph vertices
@@ -43,12 +58,6 @@ impl Graph for UndirectedGraph {
         }
 
         Ok(())
-    }
-
-    fn get_neighbors(&self, index: VertexIndex) -> Vec<VertexIndex> {
-        self.vertices
-            .get(&index)
-            .map_or(vec![], |v| v.edges.iter().cloned().collect())
     }
 }
 
@@ -250,6 +259,12 @@ impl UndirectedGraph {
 
         dfs_order.push(start);
         Ok(dfs_order.to_vec())
+    }
+
+    fn get_neighbors(&self, index: VertexIndex) -> Vec<VertexIndex> {
+        self.vertices
+            .get(&index)
+            .map_or(vec![], |v| v.edges.iter().cloned().collect())
     }
 }
 
