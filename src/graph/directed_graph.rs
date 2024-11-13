@@ -155,16 +155,18 @@ impl DirectedGraph {
 
             // Parse each line as two integers (tail and head)
             let mut parts = line.split_whitespace();
-            let tail: usize = parts
+            let mut tail: usize = parts
                 .next()
                 .ok_or(GraphError::VertexNotFound)?
                 .parse()
                 .unwrap();
-            let head: usize = parts
+            tail -= 1; // because text files are 1-indexed
+            let mut head: usize = parts
                 .next()
                 .ok_or(GraphError::VertexNotFound)?
                 .parse()
                 .unwrap();
+            head -= 1; // because text files are 1-indexed
 
             // Update max vertex index to determine the number of vertices needed
             max_vertex_index = max_vertex_index.max(tail).max(head);
