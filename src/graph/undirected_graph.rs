@@ -5,14 +5,14 @@ use std::collections::VecDeque;
 
 #[derive(Debug)]
 struct Vertex {
-    pub value: char,
+    pub _value: char,
     pub edges: HashSet<VertexIndex>,
 }
 
 impl Vertex {
     fn new(value: char) -> Self {
         Self {
-            value,
+            _value: value,
             edges: HashSet::new(),
         }
     }
@@ -23,7 +23,7 @@ impl Vertex {
 /// 2) An array containing the graph edges
 /// 3) For each edge, a pointer to each of its two endpoints
 /// 4) for each vertex, a pointer to each of the incident edges
-
+///
 /// An undirected graph represented using an adjacency list.
 pub struct UndirectedGraph {
     vertices: HashMap<VertexIndex, Vertex>,
@@ -136,8 +136,8 @@ impl UndirectedGraph {
 
             for neighbor in self.get_neighbors(current) {
                 // If the neighbor hasn't been visited (i.e., it has no distance assigned)
-                if !dist.contains_key(&neighbor) {
-                    dist.insert(neighbor, current_distance + 1);
+                if let std::collections::hash_map::Entry::Vacant(e) = dist.entry(neighbor) {
+                    e.insert(current_distance + 1);
                     queue.push_back(neighbor);
                 }
             }
@@ -283,7 +283,7 @@ mod tests {
         let mut graph = UndirectedGraph::new();
         graph.add_vertex(1, 'A');
         assert!(graph.vertices.contains_key(&1));
-        assert_eq!(graph.vertices.get(&1).unwrap().value, 'A');
+        assert_eq!(graph.vertices.get(&1).unwrap()._value, 'A');
     }
 
     #[test]
@@ -389,15 +389,15 @@ mod tests {
         graph.add_edge(3, 4).unwrap();
         graph.add_edge(3, 5).unwrap();
 
-        let mut visited = HashSet::new();
+        let mut visited: HashSet<usize> = HashSet::new();
         let mut dfs_order = Vec::new();
 
-        let mut bfs_result = graph
+        let mut bfs_result: Vec<usize> = graph
             .dfs_recursive(0, &mut visited, &mut dfs_order)
             .unwrap();
 
         bfs_result.sort(); // sort as bfs orders isn't guranteed to be the same every run
-        let expected_order = vec![0, 1, 2, 3, 4, 5];
+        let expected_order: Vec<usize> = vec![0, 1, 2, 3, 4, 5];
         // this test essentially ensures that all vertices are explored
         assert_eq!(bfs_result, expected_order);
     }
@@ -526,8 +526,8 @@ mod tests {
 
         // Extract the vectors from the tuples, sort each component, and then sort the outer list
         let mut sorted_components: Vec<Vec<usize>> = connected_components
-            .into_iter()
-            .map(|(_, mut comp)| {
+            .into_values()
+            .map(|mut comp| {
                 comp.sort_unstable();
                 comp
             })

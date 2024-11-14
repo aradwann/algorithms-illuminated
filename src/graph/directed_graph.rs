@@ -1,5 +1,6 @@
 use std::{
     cell::RefCell,
+    collections::HashSet,
     fs::File,
     io::{self, BufRead},
     path::Path,
@@ -56,7 +57,7 @@ impl Vertex {
     }
 
     // this should be used whenver it is required to change the vertex index in the graph
-    fn set_index(&mut self, index: VertexIndex) {
+    fn _set_index(&mut self, index: VertexIndex) {
         self.index = index;
     }
 }
@@ -124,85 +125,46 @@ impl DirectedGraph {
         Ok(())
     }
 
-    pub fn print_graph(&self) {
-        println!("Graph:");
-        for vertex in &self.vertices {
-            let vertex_borrowed = vertex.borrow();
-            print!("  Vertex {}:", vertex_borrowed.get_index());
-            if vertex_borrowed.outgoing_edges.is_empty() {
-                println!(" No outgoing edges");
-            } else {
-                println!();
-                for edge in &vertex_borrowed.outgoing_edges {
-                    let edge_value = edge.borrow().get_index();
-                    println!("    └──> Vertex {}", edge_value);
-                }
-            }
-        }
-    }
-
-    /// Builds a directed graph from a text file with edges in the format "tail head"
-    pub fn build_from_file<P: AsRef<Path>>(file_path: P) -> Result<Self, GraphError> {
-        let mut graph = DirectedGraph::new();
-
-        // Track maximum vertex index to know how many vertices to add
-        let mut max_vertex_index = 0;
-
-        // Open the file in read-only mode (ignoring errors).
-        let file = File::open(file_path).map_err(|_| GraphError::FileNotFound)?;
-        for line in io::BufReader::new(file).lines() {
-            let line = line.map_err(|_| GraphError::VertexNotFound)?;
-
-            // Parse each line as two integers (tail and head)
-            let mut parts = line.split_whitespace();
-            let mut tail: usize = parts
-                .next()
-                .ok_or(GraphError::VertexNotFound)?
-                .parse()
-                .unwrap();
-            tail -= 1; // because text files are 1-indexed
-            let mut head: usize = parts
-                .next()
-                .ok_or(GraphError::VertexNotFound)?
-                .parse()
-                .unwrap();
-            head -= 1; // because text files are 1-indexed
-
-            // Update max vertex index to determine the number of vertices needed
-            max_vertex_index = max_vertex_index.max(tail).max(head);
-
-            // Ensure all vertices up to the max index are created
-            while graph.vertices.len() <= max_vertex_index {
-                graph.add_vertex();
-            }
-
-            // Add edge to the graph
-            graph.add_edge(tail, head)?;
+    /// DFS (recursive version) Pseudocode
+    /// Input: graph G= (V, E) in adjancency list representation, and a vertex s ∈ V
+    /// postcondition: a vertex is reachabele from s if and only if it is marked as "explored".
+    /// -------------------------------------------------------------------------------------
+    /// // all vertices unexplored before outer call
+    /// mark s as explored
+    /// for each edge (s,v) in s's adjacency list do
+    ///     if v is unexplored then
+    ///         dfs(G, v)
+    pub fn dfs_recursive(
+        &self,
+        start: VertexIndex,
+        visited_set: &mut HashSet<usize>,
+        dfs_order: &mut Vec<usize>,
+    ) -> Result<Vec<VertexIndex>, GraphError> {
+        // Check if the starting vertex exists in the graph
+        if self.vertices.get(start).is_none() {
+            return Err(GraphError::VertexNotFound);
         }
 
-        Ok(graph)
+        // Mark the current vertex as visited
+        visited_set.insert(start);
+
+        // Recurse for each unvisited neighbor
+        for neighbor in self
+            .vertices
+            .get(start)
+            .unwrap()
+            .borrow()
+            .outgoing_edges
+            .iter()
+        {
+            if !visited_set.contains(&neighbor.borrow().index) {
+                self.dfs_recursive(neighbor.borrow().index, visited_set, dfs_order)?;
+            }
+        }
+
+        dfs_order.push(start);
+        Ok(dfs_order.to_vec())
     }
-
-    // /// DFS (recursive version) Pseudocode
-    // /// Input: graph G= (V, E) in adjancency list representation, and a vertex s ∈ V
-    // /// postcondition: a vertex is reachabele from s if and only if it is marked as "explored".
-    // /// -------------------------------------------------------------------------------------
-    // /// // all vertices unexplored before outer call
-    // /// mark s as explored
-    // /// for each edge (s,v) in s's adjacency list do
-    // ///     if v is unexplored then
-    // ///         dfs(G, v)
-    // pub fn dfs_recursive(&self, s: &VertexRc) {
-    //     // vertices must be marked unexplored before calling this function
-    //     println!("exploring {:#?}", s.borrow().value);
-    //     s.borrow_mut().explored = true;
-
-    //     for edge in &s.borrow().outgoing_edges {
-    //         if !edge.destination.borrow().explored {
-    //             self.dfs_recursive(&edge.destination);
-    //         }
-    //     }
-    // }
 
     // /// TopoSort Pseudocode
     // /// Input: directed acyclic graph G= (V, E) in adjancency list representation
@@ -370,16 +332,6 @@ impl DirectedGraph {
     // }
 
     // ////////////////// helpers /////////////////////
-    // fn mark_all_vertices_unexplored(&self) {
-    //     self.vertices
-    //         .iter()
-    //         .for_each(|v| v.borrow_mut().explored = false);
-    // }
-
-    // fn vertices(&self) -> &[VertexRc] {
-    //     self.vertices.as_ref()
-    // }
-
     // fn has_cycle(&self) -> bool {
     //     for vertex in &self.vertices {
     //         if self.detect_cycle(vertex, &mut vec![false; self.vertices.len()]) {
@@ -404,12 +356,64 @@ impl DirectedGraph {
     //     false
     // }
 
-    // fn get_vertex_index(&self, vertex: &VertexRc) -> usize {
-    //     self.vertices
-    //         .iter()
-    //         .position(|v| Rc::ptr_eq(v, vertex))
-    //         .unwrap()
-    // }
+    pub fn print_graph(&self) {
+        println!("Graph:");
+        for vertex in &self.vertices {
+            let vertex_borrowed = vertex.borrow();
+            print!("  Vertex {}:", vertex_borrowed.get_index());
+            if vertex_borrowed.outgoing_edges.is_empty() {
+                println!(" No outgoing edges");
+            } else {
+                println!();
+                for edge in &vertex_borrowed.outgoing_edges {
+                    let edge_value = edge.borrow().get_index();
+                    println!("    └──> Vertex {}", edge_value);
+                }
+            }
+        }
+    }
+
+    /// Builds a directed graph from a text file with edges in the format "tail head"
+    pub fn build_from_file<P: AsRef<Path>>(file_path: P) -> Result<Self, GraphError> {
+        let mut graph = DirectedGraph::new();
+
+        // Track maximum vertex index to know how many vertices to add
+        let mut max_vertex_index = 0;
+
+        // Open the file in read-only mode (ignoring errors).
+        let file = File::open(file_path).map_err(|_| GraphError::FileNotFound)?;
+        for line in io::BufReader::new(file).lines() {
+            let line = line.map_err(|_| GraphError::VertexNotFound)?;
+
+            // Parse each line as two integers (tail and head)
+            let mut parts = line.split_whitespace();
+            let mut tail: usize = parts
+                .next()
+                .ok_or(GraphError::VertexNotFound)?
+                .parse()
+                .unwrap();
+            tail -= 1; // because text files are 1-indexed
+            let mut head: usize = parts
+                .next()
+                .ok_or(GraphError::VertexNotFound)?
+                .parse()
+                .unwrap();
+            head -= 1; // because text files are 1-indexed
+
+            // Update max vertex index to determine the number of vertices needed
+            max_vertex_index = max_vertex_index.max(tail).max(head);
+
+            // Ensure all vertices up to the max index are created
+            while graph.vertices.len() <= max_vertex_index {
+                graph.add_vertex();
+            }
+
+            // Add edge to the graph
+            graph.add_edge(tail, head)?;
+        }
+
+        Ok(graph)
+    }
 }
 impl Default for DirectedGraph {
     fn default() -> Self {
@@ -527,6 +531,28 @@ mod tests {
     }
 
     #[test]
+    fn test_dfs_recursive_traversal() {
+        let graph = DirectedGraph::with_vertices(4);
+
+        graph.add_edge(0, 1).unwrap();
+        graph.add_edge(0, 2).unwrap();
+        graph.add_edge(1, 3).unwrap();
+        graph.add_edge(2, 3).unwrap();
+
+        let mut visited: HashSet<usize> = HashSet::new();
+        let mut dfs_order = Vec::new();
+
+        let mut bfs_result: Vec<usize> = graph
+            .dfs_recursive(0, &mut visited, &mut dfs_order)
+            .unwrap();
+
+        bfs_result.sort(); // sort as bfs orders isn't guranteed to be the same every run
+        let expected_order: Vec<usize> = vec![0, 1, 2, 3];
+        // this test essentially ensures that all vertices are explored
+        assert_eq!(bfs_result, expected_order);
+    }
+
+    #[test]
     fn test_build_from_file() {
         // Create a temporary file path in the system's temp directory
         let mut path = temp_dir();
@@ -546,15 +572,25 @@ mod tests {
         let graph = DirectedGraph::build_from_file(&path).expect("Failed to build graph");
 
         // Check vertices
-        assert_eq!(graph.vertices.len(), 5); // Max index is 4, so 5 vertices (0 through 4)
+        assert_eq!(graph.vertices.len(), 4); // Max index is 4, so 5 vertices (0 through 4)
 
         // Check edges for correctness
-        assert_eq!(graph.vertices[1].borrow().outgoing_edges.len(), 1);
-        assert_eq!(graph.vertices[2].borrow().outgoing_edges.len(), 2);
+        assert_eq!(graph.vertices[0].borrow().outgoing_edges.len(), 1);
+        assert_eq!(graph.vertices[1].borrow().outgoing_edges.len(), 2);
+        assert_eq!(graph.vertices[2].borrow().outgoing_edges.len(), 1);
         assert_eq!(graph.vertices[3].borrow().outgoing_edges.len(), 1);
-        assert_eq!(graph.vertices[4].borrow().outgoing_edges.len(), 1);
 
         // Validate specific edges
+        assert!(graph.vertices[0]
+            .borrow()
+            .outgoing_edges
+            .iter()
+            .any(|v| v.borrow().get_index() == 2));
+        assert!(graph.vertices[1]
+            .borrow()
+            .outgoing_edges
+            .iter()
+            .any(|v| v.borrow().get_index() == 2));
         assert!(graph.vertices[1]
             .borrow()
             .outgoing_edges
@@ -565,21 +601,11 @@ mod tests {
             .outgoing_edges
             .iter()
             .any(|v| v.borrow().get_index() == 3));
-        assert!(graph.vertices[2]
-            .borrow()
-            .outgoing_edges
-            .iter()
-            .any(|v| v.borrow().get_index() == 4));
         assert!(graph.vertices[3]
             .borrow()
             .outgoing_edges
             .iter()
-            .any(|v| v.borrow().get_index() == 4));
-        assert!(graph.vertices[4]
-            .borrow()
-            .outgoing_edges
-            .iter()
-            .any(|v| v.borrow().get_index() == 1));
+            .any(|v| v.borrow().get_index() == 0));
 
         // Clean up: Remove the temporary file after test
         std::fs::remove_file(&path).expect("Failed to delete temporary file");
