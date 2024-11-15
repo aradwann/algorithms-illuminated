@@ -137,33 +137,26 @@ impl DirectedGraph {
     pub fn dfs_recursive(
         &self,
         start: VertexIndex,
-        visited_set: &mut HashSet<usize>,
-        dfs_order: &mut Vec<usize>,
+        visited: &mut HashSet<usize>,
+        order: &mut Vec<usize>,
     ) -> Result<Vec<VertexIndex>, GraphError> {
-        // Check if the starting vertex exists in the graph
-        if self.vertices.get(start).is_none() {
-            return Err(GraphError::VertexNotFound);
-        }
+        // Ensure the starting vertex exists
+        let vertex = self.vertices.get(start).ok_or(GraphError::VertexNotFound)?;
 
         // Mark the current vertex as visited
-        visited_set.insert(start);
+        visited.insert(start);
 
-        // Recurse for each unvisited neighbor
-        for neighbor in self
-            .vertices
-            .get(start)
-            .unwrap()
-            .borrow()
-            .outgoing_edges
-            .iter()
-        {
-            if !visited_set.contains(&neighbor.borrow().index) {
-                self.dfs_recursive(neighbor.borrow().index, visited_set, dfs_order)?;
+        // Recurse for unvisited neighbors
+        for neighbor in &vertex.borrow().outgoing_edges {
+            let neighbor_index = neighbor.borrow().index;
+            if !visited.contains(&neighbor_index) {
+                self.dfs_recursive(neighbor_index, visited, order)?;
             }
         }
 
-        dfs_order.push(start);
-        Ok(dfs_order.to_vec())
+        // Record the vertex in the DFS order
+        order.push(start);
+        Ok(order.clone())
     }
 
     // /// TopoSort Pseudocode

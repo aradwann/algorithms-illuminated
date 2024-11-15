@@ -121,29 +121,31 @@ impl UndirectedGraph {
     ///             mark w as explored
     ///             add w to the end of Q
     pub fn shortest_path_bfs(&self, start: usize) -> Result<HashMap<usize, usize>, GraphError> {
+        // Ensure the starting vertex exists
         if !self.vertices.contains_key(&start) {
             return Err(GraphError::VertexNotFound);
         }
-        let mut dist = HashMap::new();
+
+        let mut distances = HashMap::new();
         let mut queue = VecDeque::new();
 
-        // Start by setting the distance to the start node as 0
-        dist.insert(start, 0);
+        // Initialize the BFS
+        distances.insert(start, 0);
         queue.push_back(start);
 
         while let Some(current) = queue.pop_front() {
-            let current_distance = dist[&current];
+            let current_distance = distances[&current];
 
             for neighbor in self.get_neighbors(current) {
-                // If the neighbor hasn't been visited (i.e., it has no distance assigned)
-                if let std::collections::hash_map::Entry::Vacant(e) = dist.entry(neighbor) {
-                    e.insert(current_distance + 1);
+                // Add unvisited neighbors to the queue
+                distances.entry(neighbor).or_insert_with(|| {
                     queue.push_back(neighbor);
-                }
+                    current_distance + 1
+                });
             }
         }
 
-        Ok(dist)
+        Ok(distances)
     }
 
     /// Pseudocode undirect connected components
