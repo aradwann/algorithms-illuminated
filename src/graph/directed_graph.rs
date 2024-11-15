@@ -23,19 +23,10 @@ use super::{GraphError, VertexIndex};
 type VertexRc = Rc<RefCell<Vertex>>;
 type VertexWeak = Weak<RefCell<Vertex>>;
 
-///  holds the reference to the destination vertex (Rc) and the length of the edge
-// #[derive(Debug)]
-// struct OutgoingEdge {
-//     destination: VertexRc,
-//     length: Option<usize>,
-// }
-
-///  holds the reference to the source vertex (Weak) and the length of the edge
-// #[derive(Debug)]
-// struct IncomingEdge {
-//     source: VertexWeak,
-//     length: Option<usize>,
-// }
+/// vec of topological order of the vertices
+/// where the index in the vector reporesent the vertex index
+/// and the value represent its topological order
+type TopologicalSort = Vec<usize>;
 
 #[derive(Debug)]
 pub struct Vertex {
@@ -139,7 +130,7 @@ impl DirectedGraph {
         start: VertexIndex,
         visited: &mut HashSet<usize>,
         order: &mut Vec<usize>,
-    ) -> Result<Vec<VertexIndex>, GraphError> {
+    ) -> Result<(), GraphError> {
         // Ensure the starting vertex exists
         let vertex = self.vertices.get(start).ok_or(GraphError::VertexNotFound)?;
 
@@ -156,29 +147,72 @@ impl DirectedGraph {
 
         // Record the vertex in the DFS order
         order.push(start);
-        Ok(order.clone())
+        Ok(())
     }
 
-    // /// TopoSort Pseudocode
-    // /// Input: directed acyclic graph G= (V, E) in adjancency list representation
-    // /// postcondition: the f-values of vertices constitute a topological ordering of G.
-    // /// -------------------------------------------------------------------------------------
-    // /// mark all vertices as unexplored
-    // /// curLabel := |V| // keeps track of ordering
-    // /// for every v ∈ V do
-    // ///     if v is unexplored then // in a prior DFS
-    // ///         DFS-Topo(G, v)
-    // pub fn topo_sort(&self) {
-    //     // self.mark_all_vertices_unexplored();
-    //     let vertices = &self.vertices;
-    //     let mut current_label = vertices.len();
+    /// TopoSort Pseudocode
+    /// Input: directed acyclic graph G= (V, E) in adjancency list representation
+    /// postcondition: the f-values of vertices constitute a topological ordering of G.
+    /// -------------------------------------------------------------------------------------
+    /// mark all vertices as unexplored
+    /// curLabel := |V| // keeps track of ordering
+    /// for every v ∈ V do
+    ///     if v is unexplored then // in a prior DFS
+    ///         DFS-Topo(G, v)
+    pub fn topo_sort(&self) -> TopologicalSort {
+        let vertices = &self.vertices;
+        let vertcies_num = vertices.len();
+        let mut current_label = vertcies_num;
+        let mut visited_set = HashSet::new();
+        let mut topological_sort = vec![0; vertcies_num];
+        for v in vertices {
+            let vertex_index = &v.borrow().get_index();
+            if !visited_set.contains(vertex_index) {
+                self.dfs_topo(
+                    *vertex_index,
+                    &mut visited_set,
+                    &mut topological_sort,
+                    &mut current_label,
+                );
+            }
+        }
+        topological_sort
+    }
 
-    //     for v in vertices {
-    //         if !v.borrow().explored {
-    //             self.dfs_topo(v, &mut current_label);
-    //         }
-    //     }
-    // }
+    /// DFS-Topo Pseudocode
+    /// Input: graph G= (V, E) in adjancency list representation and a vertex s ∈ V
+    /// postcondition: every vertex reachable from s is marked as 'explored' and has an assigned f-value
+    /// -------------------------------------------------------------------------------------
+    /// mark s as explored
+    ///
+    /// for each edge (s,v) in s's outgoing adjacency list do
+    ///     if v is unexplored then
+    ///         DFS-Topo(G,v)
+    /// f(s) := curLabel    // s's position in ordering
+    /// curLabel := curLabel -1 // work right-to-left
+    fn dfs_topo(
+        &self,
+        vertex_index: VertexIndex,
+        visited: &mut HashSet<usize>,
+        topological_sort: &mut TopologicalSort,
+        current_label: &mut usize,
+    ) {
+        let vertex = self.vertices.get(vertex_index).unwrap();
+
+        // Mark the current vertex as visited
+        visited.insert(vertex_index);
+
+        // Recurse for unvisited neighbors
+        for neighbor in &vertex.borrow().outgoing_edges {
+            let neighbor_index = neighbor.borrow().index;
+            if !visited.contains(&neighbor_index) {
+                self.dfs_topo(neighbor_index, visited, topological_sort, current_label);
+            }
+        }
+
+        topological_sort[vertex_index] = *current_label;
+        *current_label -= 1;
+    }
 
     // fn topo_sort_reversed(&mut self) {
     //     let vertices = &self.vertices;
@@ -195,31 +229,6 @@ impl DirectedGraph {
     //         sorted_vertices[v.borrow().topo_order.unwrap() - 1] = Rc::clone(v);
     //     }
     //     self.vertices = sorted_vertices;
-    // }
-
-    // /// DFS-Topo Pseudocode
-    // /// Input: graph G= (V, E) in adjancency list representation and a vertex s ∈ V
-    // /// postcondition: every vertex reachable from s is marked as 'explored' and has an assigned f-value
-    // /// -------------------------------------------------------------------------------------
-    // /// mark s as explored
-    // ///
-    // /// for each edge (s,v) in s's outgoing adjacency list do
-    // ///     if v is unexplored then
-    // ///         DFS-Topo(G,v)
-    // /// f(s) := curLabel    // s's position in ordering
-    // /// curLabel := curLabel -1 // work right-to-left
-    // fn dfs_topo(&self, vertex: &VertexRc, current_label: &mut usize) {
-    //     vertex.borrow_mut().explored = true;
-
-    //     for edge in &vertex.borrow().outgoing_edges {
-    //         let destination = &edge.destination;
-    //         if !destination.borrow().explored {
-    //             self.dfs_topo(destination, current_label);
-    //         }
-    //     }
-
-    //     vertex.borrow_mut().topo_order = Some(*current_label);
-    //     *current_label -= 1;
     // }
 
     // fn dfs_topo_reversed(&self, vertex: &VertexRc, current_label: &mut usize) {
@@ -535,14 +544,48 @@ mod tests {
         let mut visited: HashSet<usize> = HashSet::new();
         let mut dfs_order = Vec::new();
 
-        let mut bfs_result: Vec<usize> = graph
+        graph
             .dfs_recursive(0, &mut visited, &mut dfs_order)
             .unwrap();
 
-        bfs_result.sort(); // sort as bfs orders isn't guranteed to be the same every run
+        dfs_order.sort(); // sort as bfs orders isn't guranteed to be the same every run
         let expected_order: Vec<usize> = vec![0, 1, 2, 3];
         // this test essentially ensures that all vertices are explored
-        assert_eq!(bfs_result, expected_order);
+        assert_eq!(dfs_order, expected_order);
+    }
+
+    #[test]
+    fn test_topo_sort() {
+        // Create a new graph with vertices (0, 1, 2, 3, 4)
+        let graph = DirectedGraph::with_vertices(5);
+
+        // Add directed edges to create a Directed Acyclic Graph (DAG)
+        // 0 -> 1, 0 -> 2, 1 -> 3, 2 -> 3, 3 -> 4
+        graph.add_edge(0, 1).unwrap();
+        graph.add_edge(0, 2).unwrap();
+        graph.add_edge(1, 3).unwrap();
+        graph.add_edge(2, 3).unwrap();
+        graph.add_edge(3, 4).unwrap();
+
+        // Perform topological sort
+        let topo_sort_result = graph.topo_sort();
+
+        // Verify the result
+        // Expected order: 0, 1, 2, 3, 4 or any valid topological order
+        for (from, to) in [
+            (0, 1), // 0 -> 1
+            (0, 2), // 0 -> 2
+            (1, 3), // 1 -> 3
+            (2, 3), // 2 -> 3
+            (3, 4), // 3 -> 4
+        ] {
+            assert!(
+                topo_sort_result[from] < topo_sort_result[to],
+                "Vertex {} should come before vertex {} in topological sort",
+                from,
+                to
+            );
+        }
     }
 
     #[test]
