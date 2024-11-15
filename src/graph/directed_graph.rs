@@ -116,6 +116,11 @@ impl DirectedGraph {
         Ok(())
     }
 
+    pub fn dfs_recursive(&self, start: VertexIndex) -> Result<Vec<usize>, GraphError> {
+        let mut visited: HashSet<usize> = HashSet::new();
+        let mut dfs_order = Vec::new();
+        self.dfs_recursive_subroutine(start, &mut visited, &mut dfs_order)
+    }
     /// DFS (recursive version) Pseudocode
     /// Input: graph G= (V, E) in adjancency list representation, and a vertex s ∈ V
     /// postcondition: a vertex is reachabele from s if and only if it is marked as "explored".
@@ -125,12 +130,12 @@ impl DirectedGraph {
     /// for each edge (s,v) in s's adjacency list do
     ///     if v is unexplored then
     ///         dfs(G, v)
-    pub fn dfs_recursive(
+    fn dfs_recursive_subroutine(
         &self,
         start: VertexIndex,
         visited: &mut HashSet<usize>,
         order: &mut Vec<usize>,
-    ) -> Result<(), GraphError> {
+    ) -> Result<Vec<usize>, GraphError> {
         // Ensure the starting vertex exists
         let vertex = self.vertices.get(start).ok_or(GraphError::VertexNotFound)?;
 
@@ -141,13 +146,13 @@ impl DirectedGraph {
         for neighbor in &vertex.borrow().outgoing_edges {
             let neighbor_index = neighbor.borrow().index;
             if !visited.contains(&neighbor_index) {
-                self.dfs_recursive(neighbor_index, visited, order)?;
+                self.dfs_recursive_subroutine(neighbor_index, visited, order)?;
             }
         }
 
         // Record the vertex in the DFS order
         order.push(start);
-        Ok(())
+        Ok(order.to_vec())
     }
 
     /// TopoSort Pseudocode
@@ -214,43 +219,6 @@ impl DirectedGraph {
         *current_label -= 1;
     }
 
-    // fn topo_sort_reversed(&mut self) {
-    //     let vertices = &self.vertices;
-    //     let mut current_label = vertices.len();
-
-    //     for v in vertices {
-    //         if !v.borrow().explored {
-    //             self.dfs_topo_reversed(v, &mut current_label);
-    //         }
-    //     }
-
-    //     let mut sorted_vertices = vec![Rc::new(RefCell::new(Vertex::new(' '))); vertices.len()];
-    //     for v in vertices {
-    //         sorted_vertices[v.borrow().topo_order.unwrap() - 1] = Rc::clone(v);
-    //     }
-    //     self.vertices = sorted_vertices;
-    // }
-
-    // fn dfs_topo_reversed(&self, vertex: &VertexRc, current_label: &mut usize) {
-    //     vertex.borrow_mut().explored = true;
-
-    //     for incoming_edge in &vertex.borrow().incoming_edges {
-    //         if let Some(incoming_edge_tail) = incoming_edge.source.upgrade() {
-    //             if !incoming_edge_tail.borrow().explored {
-    //                 self.dfs_topo_reversed(&incoming_edge_tail, current_label);
-    //             }
-    //         }
-    //     }
-
-    //     vertex.borrow_mut().topo_order = Some(*current_label);
-    //     *current_label -= 1;
-    //     println!(
-    //         "vertex index is {} and its topo order is {}",
-    //         vertex.borrow().value,
-    //         vertex.borrow().topo_order.unwrap()
-    //     );
-    // }
-
     // /// Kosaraju Pseudocode
     // /// Input: graph G= (V, E) in adjancency list representation, with V = {1,2,3,...,n}
     // /// postcondition: for every v,w ∈ V, scc(v) = scc(w) if and only if v,w are in the same SCC of G
@@ -306,6 +274,43 @@ impl DirectedGraph {
     //             self.dfs_scc(&outgoing_edge.destination, num_scc);
     //         }
     //     }
+    // }
+
+    // fn topo_sort_reversed(&mut self) {
+    //     let vertices = &self.vertices;
+    //     let mut current_label = vertices.len();
+
+    //     for v in vertices {
+    //         if !v.borrow().explored {
+    //             self.dfs_topo_reversed(v, &mut current_label);
+    //         }
+    //     }
+
+    //     let mut sorted_vertices = vec![Rc::new(RefCell::new(Vertex::new(' '))); vertices.len()];
+    //     for v in vertices {
+    //         sorted_vertices[v.borrow().topo_order.unwrap() - 1] = Rc::clone(v);
+    //     }
+    //     self.vertices = sorted_vertices;
+    // }
+
+    // fn dfs_topo_reversed(&self, vertex: &VertexRc, current_label: &mut usize) {
+    //     vertex.borrow_mut().explored = true;
+
+    //     for incoming_edge in &vertex.borrow().incoming_edges {
+    //         if let Some(incoming_edge_tail) = incoming_edge.source.upgrade() {
+    //             if !incoming_edge_tail.borrow().explored {
+    //                 self.dfs_topo_reversed(&incoming_edge_tail, current_label);
+    //             }
+    //         }
+    //     }
+
+    //     vertex.borrow_mut().topo_order = Some(*current_label);
+    //     *current_label -= 1;
+    //     println!(
+    //         "vertex index is {} and its topo order is {}",
+    //         vertex.borrow().value,
+    //         vertex.borrow().topo_order.unwrap()
+    //     );
     // }
 
     // /// Dijkstra Pseudocode
@@ -541,12 +546,7 @@ mod tests {
         graph.add_edge(1, 3).unwrap();
         graph.add_edge(2, 3).unwrap();
 
-        let mut visited: HashSet<usize> = HashSet::new();
-        let mut dfs_order = Vec::new();
-
-        graph
-            .dfs_recursive(0, &mut visited, &mut dfs_order)
-            .unwrap();
+        let mut dfs_order = graph.dfs_recursive(0).unwrap();
 
         dfs_order.sort(); // sort as bfs orders isn't guranteed to be the same every run
         let expected_order: Vec<usize> = vec![0, 1, 2, 3];
