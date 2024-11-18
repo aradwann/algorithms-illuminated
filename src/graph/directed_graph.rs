@@ -209,7 +209,7 @@ impl DirectedGraph {
 
         // Recurse for unvisited neighbors
         for neighbor in &vertex.borrow().outgoing_edges {
-            let neighbor_index = neighbor.borrow().index;
+            let neighbor_index = neighbor.borrow().get_index();
             if !visited.contains(&neighbor_index) {
                 self.dfs_topo(neighbor_index, visited, topological_sort, current_label);
             }
@@ -219,100 +219,129 @@ impl DirectedGraph {
         *current_label -= 1;
     }
 
-    // /// Kosaraju Pseudocode
-    // /// Input: graph G= (V, E) in adjancency list representation, with V = {1,2,3,...,n}
-    // /// postcondition: for every v,w ∈ V, scc(v) = scc(w) if and only if v,w are in the same SCC of G
-    // /// -------------------------------------------------------------------------------------
-    // /// G_rev := G with all edges reversed
-    // ///
-    // /// // first pass of depth-first search
-    // /// // (computes f(v)'s, the magical ordering)
-    // /// TopoSort(G_rev)
-    // ///
-    // /// // second pass of depth-first search
-    // /// // (finds SCCs in reverse topological order)
-    // /// mark all vertices of G as unexplored
-    // /// numSCC := 0
-    // /// for each v ∈ V, in increasing order of f(v) do
-    // ///     if v is unexplored then
-    // ///         numSCC := numSCC +1
-    // ///         // assign scc-values
-    // ///         DFS-SCC(G, v)
-    // ///
-    // pub fn kosaraju(&mut self) -> usize {
-    //     self.mark_all_vertices_unexplored();
-    //     self.topo_sort_reversed();
-    //     self.mark_all_vertices_unexplored();
-    //     let mut num_scc: usize = 0;
+    /// Kosaraju Pseudocode
+    /// Input: graph G= (V, E) in adjancency list representation, with V = {1,2,3,...,n}
+    /// postcondition: for every v,w ∈ V, scc(v) = scc(w) if and only if v,w are in the same SCC of G
+    /// -------------------------------------------------------------------------------------
+    /// G_rev := G with all edges reversed
+    ///
+    /// // first pass of depth-first search
+    /// // (computes f(v)'s, the magical ordering)
+    /// TopoSort(G_rev)
+    ///
+    /// // second pass of depth-first search
+    /// // (finds SCCs in reverse topological order)
+    /// mark all vertices of G as unexplored
+    /// numSCC := 0
+    /// for each v ∈ V, in increasing order of f(v) do
+    ///     if v is unexplored then
+    ///         numSCC := numSCC +1
+    ///         // assign scc-values
+    ///         DFS-SCC(G, v)
+    ///
+    pub fn kosaraju(&self) -> Vec<usize> {
+        // returns a vector where the index is the index of the vertex the element represents the scc id
+        let reversed_topo = self.reversed_topo_sort();
+        let mut num_scc: usize = 0;
+        let mut visited_set = HashSet::new();
+        let vertcies_num = self.vertices.len();
+        let mut scc_vec = vec![0; vertcies_num];
 
-    //     for v in self.vertices() {
-    //         if !v.borrow().explored {
-    //             num_scc += 1;
-    //             self.dfs_scc(v, &mut num_scc);
-    //         }
-    //     }
+        for (_, vertex_index) in reversed_topo {
+            if !visited_set.contains(&vertex_index) {
+                num_scc += 1;
+                self.dfs_scc(vertex_index, &mut scc_vec, num_scc, &mut visited_set);
+            }
+        }
 
-    //     num_scc
-    // }
+        scc_vec
+    }
 
-    // /// DSF-SCC Pseudocode
-    // /// Input: directed graph G= (V, E) in adjancency list representation and a vertex s ∈ V
-    // /// postcondition: every vertex reachable from s is marked as 'explored' and has an assigned scc-value
-    // /// -------------------------------------------------------------------------------------
-    // /// mark s as explored
-    // /// scc(s) := numSCC // global variable above
-    // /// for each edge (s,v) in s's outgoing adjacency list do
-    // ///     if v is unexplored then
-    // ///         DFS-SCC (G,v)
-    // ///
-    // fn dfs_scc(&self, vertex: &VertexRc, num_scc: &mut usize) {
-    //     vertex.borrow_mut().explored = true;
-    //     vertex.borrow_mut().scc = Some(*num_scc);
+    /// DSF-SCC Pseudocode
+    /// Input: directed graph G= (V, E) in adjancency list representation and a vertex s ∈ V
+    /// postcondition: every vertex reachable from s is marked as 'explored' and has an assigned scc-value
+    /// -------------------------------------------------------------------------------------
+    /// mark s as explored
+    /// scc(s) := numSCC // global variable above
+    /// for each edge (s,v) in s's outgoing adjacency list do
+    ///     if v is unexplored then
+    ///         DFS-SCC (G,v)
+    ///
+    fn dfs_scc(
+        &self,
+        vertex_index: usize,
+        scc_vec: &mut Vec<usize>,
+        num_scc: usize,
+        visted_set: &mut HashSet<usize>,
+    ) {
+        visted_set.insert(vertex_index);
+        scc_vec[vertex_index] = num_scc;
 
-    //     for outgoing_edge in &vertex.borrow().outgoing_edges {
-    //         if !outgoing_edge.destination.borrow().explored {
-    //             self.dfs_scc(&outgoing_edge.destination, num_scc);
-    //         }
-    //     }
-    // }
+        let vertex = &self.vertices[vertex_index];
+        for neighbor in &vertex.borrow().outgoing_edges {
+            let neighbor_index = neighbor.borrow().get_index();
+            if !visted_set.contains(&neighbor_index) {
+                self.dfs_scc(neighbor_index, scc_vec, num_scc, visted_set);
+            }
+        }
+    }
 
-    // fn topo_sort_reversed(&mut self) {
-    //     let vertices = &self.vertices;
-    //     let mut current_label = vertices.len();
+    pub fn reversed_topo_sort(&self) -> Vec<(usize, usize)> {
+        let vertices = &self.vertices;
+        let vertcies_num = vertices.len();
+        let mut current_label = 0; // Start from 0 for reversed order
+        let mut visited_set = HashSet::new();
+        let mut topological_sort = vec![0; vertcies_num];
+        for v in vertices {
+            let vertex_index = &v.borrow().get_index();
+            if !visited_set.contains(vertex_index) {
+                self.dfs_reversed_topo(
+                    *vertex_index,
+                    &mut visited_set,
+                    &mut topological_sort,
+                    &mut current_label,
+                );
+            }
+        }
 
-    //     for v in vertices {
-    //         if !v.borrow().explored {
-    //             self.dfs_topo_reversed(v, &mut current_label);
-    //         }
-    //     }
+        // Collect (label, index) pairs
+        let mut sorted_vertices: Vec<(usize, usize)> = topological_sort
+            .iter()
+            .enumerate() // Produces (index, &label)
+            .map(|(index, &label)| (label, index)) // Swap to (label, index)
+            .collect();
 
-    //     let mut sorted_vertices = vec![Rc::new(RefCell::new(Vertex::new(' '))); vertices.len()];
-    //     for v in vertices {
-    //         sorted_vertices[v.borrow().topo_order.unwrap() - 1] = Rc::clone(v);
-    //     }
-    //     self.vertices = sorted_vertices;
-    // }
+        // Sort the pairs by label (ascending order)
+        sorted_vertices.sort_by_key(|&(label, _)| label);
 
-    // fn dfs_topo_reversed(&self, vertex: &VertexRc, current_label: &mut usize) {
-    //     vertex.borrow_mut().explored = true;
+        // Extract indices in sorted order
+        sorted_vertices
+    }
 
-    //     for incoming_edge in &vertex.borrow().incoming_edges {
-    //         if let Some(incoming_edge_tail) = incoming_edge.source.upgrade() {
-    //             if !incoming_edge_tail.borrow().explored {
-    //                 self.dfs_topo_reversed(&incoming_edge_tail, current_label);
-    //             }
-    //         }
-    //     }
+    fn dfs_reversed_topo(
+        &self,
+        vertex_index: VertexIndex,
+        visited: &mut HashSet<usize>,
+        topological_sort: &mut TopologicalSort,
+        current_label: &mut usize,
+    ) {
+        let vertex = self.vertices.get(vertex_index).unwrap();
 
-    //     vertex.borrow_mut().topo_order = Some(*current_label);
-    //     *current_label -= 1;
-    //     println!(
-    //         "vertex index is {} and its topo order is {}",
-    //         vertex.borrow().value,
-    //         vertex.borrow().topo_order.unwrap()
-    //     );
-    // }
+        // Mark the current vertex as visited
+        visited.insert(vertex_index);
 
+        // Recurse for unvisited neighbors
+        for neighbor in &vertex.borrow().outgoing_edges {
+            let neighbor_index = neighbor.borrow().get_index();
+            if !visited.contains(&neighbor_index) {
+                self.dfs_reversed_topo(neighbor_index, visited, topological_sort, current_label);
+            }
+        }
+
+        // Assign label in increasing order
+        topological_sort[vertex_index] = *current_label;
+        *current_label += 1; // Increment instead of decrement
+    }
     // /// Dijkstra Pseudocode
     // /// Input: directed graph G= (V, E) in adjancency list representation and a vertex s ∈ V,
     // ///        a length le >= 0 for each e ∈ E
