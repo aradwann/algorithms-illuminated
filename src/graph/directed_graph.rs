@@ -366,7 +366,7 @@ impl DirectedGraph {
         for (_, vertex_index) in reversed_topo {
             if !visited_set.contains(&vertex_index) {
                 num_scc += 1;
-                self.dfs_scc(vertex_index, &mut scc_vec, num_scc, &mut visited_set);
+                self._dfs_scc_iterative(vertex_index, &mut scc_vec, num_scc, &mut visited_set);
             }
         }
 
@@ -383,7 +383,7 @@ impl DirectedGraph {
     ///     if v is unexplored then
     ///         DFS-SCC (G,v)
     ///
-    fn dfs_scc(
+    fn _dfs_scc(
         &self,
         vertex_index: usize,
         scc_vec: &mut Vec<usize>,
@@ -397,7 +397,32 @@ impl DirectedGraph {
         for neighbor in &vertex.borrow().outgoing_edges {
             let neighbor_index = neighbor.borrow().get_index();
             if !visted_set.contains(&neighbor_index) {
-                self.dfs_scc(neighbor_index, scc_vec, num_scc, visted_set);
+                self._dfs_scc(neighbor_index, scc_vec, num_scc, visted_set);
+            }
+        }
+    }
+
+    fn _dfs_scc_iterative(
+        &self,
+        vertex_index: usize,
+        scc_vec: &mut Vec<usize>,
+        num_scc: usize,
+        visited: &mut HashSet<usize>,
+    ) {
+        let mut stack = Vec::new();
+        stack.push(vertex_index);
+
+        while let Some(current) = stack.pop() {
+            if !visited.contains(&current) {
+                visited.insert(current);
+                scc_vec[current] = num_scc;
+
+                let vertex = self.vertices.get(current).unwrap();
+
+                for neighbor in &vertex.borrow().outgoing_edges {
+                    let neighbor_index = neighbor.borrow().get_index();
+                    stack.push(neighbor_index);
+                }
             }
         }
     }
