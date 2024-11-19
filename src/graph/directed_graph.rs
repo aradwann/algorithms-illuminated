@@ -164,7 +164,7 @@ impl DirectedGraph {
     /// for every v ∈ V do
     ///     if v is unexplored then // in a prior DFS
     ///         DFS-Topo(G, v)
-    pub fn topo_sort(&self) -> TopologicalSort {
+    pub fn topo_sort(&self, reversed: bool) -> Vec<(usize, usize)> {
         let vertices = &self.vertices;
         let vertcies_num = vertices.len();
         let mut current_label = vertcies_num;
@@ -178,10 +178,22 @@ impl DirectedGraph {
                     &mut visited_set,
                     &mut topological_sort,
                     &mut current_label,
+                    reversed,
                 );
             }
         }
-        topological_sort
+        // topological_sort
+
+        let mut sorted_vertices: Vec<(usize, usize)> = topological_sort
+            .iter()
+            .enumerate() // Produces (index, &label)
+            .map(|(index, &label)| (label, index))
+            .collect();
+
+        // Sort the pairs by label (ascending order)
+        sorted_vertices.sort_by_key(|&(label, _)| label);
+
+        sorted_vertices
     }
 
     /// DFS-Topo Pseudocode
@@ -201,17 +213,44 @@ impl DirectedGraph {
         visited: &mut HashSet<usize>,
         topological_sort: &mut TopologicalSort,
         current_label: &mut usize,
+        reversed: bool,
     ) {
         let vertex = self.vertices.get(vertex_index).unwrap();
 
         // Mark the current vertex as visited
         visited.insert(vertex_index);
 
-        // Recurse for unvisited neighbors
-        for neighbor in &vertex.borrow().outgoing_edges {
-            let neighbor_index = neighbor.borrow().get_index();
-            if !visited.contains(&neighbor_index) {
-                self.dfs_topo(neighbor_index, visited, topological_sort, current_label);
+        if !reversed {
+            // Recurse for unvisited neighbors
+            for neighbor in &vertex.borrow().outgoing_edges {
+                let neighbor_index = neighbor.borrow().get_index();
+                if !visited.contains(&neighbor_index) {
+                    self.dfs_topo(
+                        neighbor_index,
+                        visited,
+                        topological_sort,
+                        current_label,
+                        reversed,
+                    );
+                }
+            }
+        } else {
+            // Recurse for unvisited vertices that have edges pointing to this vertex (incoming edges)
+            for neighbor_weak in &vertex.borrow().incoming_edges {
+                if let Some(neighbor_rc) = neighbor_weak.upgrade() {
+                    // Upgrade the Weak reference to Rc
+                    let neighbor_index = neighbor_rc.borrow().get_index();
+                    if !visited.contains(&neighbor_index) {
+                        // Visit the incoming vertex
+                        self.dfs_topo(
+                            neighbor_index,
+                            visited,
+                            topological_sort,
+                            current_label,
+                            reversed,
+                        );
+                    }
+                }
             }
         }
 
@@ -241,7 +280,7 @@ impl DirectedGraph {
     ///
     pub fn kosaraju(&self) -> Vec<usize> {
         // returns a vector where the index is the index of the vertex the element represents the scc id
-        let reversed_topo = self.reversed_topo_sort();
+        let reversed_topo = self.topo_sort(true);
         let mut num_scc: usize = 0;
         let mut visited_set = HashSet::new();
         let vertcies_num = self.vertices.len();
@@ -286,62 +325,6 @@ impl DirectedGraph {
         }
     }
 
-    pub fn reversed_topo_sort(&self) -> Vec<(usize, usize)> {
-        let vertices = &self.vertices;
-        let vertcies_num = vertices.len();
-        let mut current_label = 0; // Start from 0 for reversed order
-        let mut visited_set = HashSet::new();
-        let mut topological_sort = vec![0; vertcies_num];
-        for v in vertices {
-            let vertex_index = &v.borrow().get_index();
-            if !visited_set.contains(vertex_index) {
-                self.dfs_reversed_topo(
-                    *vertex_index,
-                    &mut visited_set,
-                    &mut topological_sort,
-                    &mut current_label,
-                );
-            }
-        }
-
-        // Collect (label, index) pairs
-        let mut sorted_vertices: Vec<(usize, usize)> = topological_sort
-            .iter()
-            .enumerate() // Produces (index, &label)
-            .map(|(index, &label)| (label, index)) // Swap to (label, index)
-            .collect();
-
-        // Sort the pairs by label (ascending order)
-        sorted_vertices.sort_by_key(|&(label, _)| label);
-
-        // Extract indices in sorted order
-        sorted_vertices
-    }
-
-    fn dfs_reversed_topo(
-        &self,
-        vertex_index: VertexIndex,
-        visited: &mut HashSet<usize>,
-        topological_sort: &mut TopologicalSort,
-        current_label: &mut usize,
-    ) {
-        let vertex = self.vertices.get(vertex_index).unwrap();
-
-        // Mark the current vertex as visited
-        visited.insert(vertex_index);
-
-        // Recurse for unvisited neighbors
-        for neighbor in &vertex.borrow().outgoing_edges {
-            let neighbor_index = neighbor.borrow().get_index();
-            if !visited.contains(&neighbor_index) {
-                self.dfs_reversed_topo(neighbor_index, visited, topological_sort, current_label);
-            }
-        }
-
-        // Assign label in increasing order
-        topological_sort[vertex_index] = *current_label;
-        *current_label += 1; // Increment instead of decrement
-    }
     // /// Dijkstra Pseudocode
     // /// Input: directed graph G= (V, E) in adjancency list representation and a vertex s ∈ V,
     // ///        a length le >= 0 for each e ∈ E
@@ -410,7 +393,10 @@ impl DirectedGraph {
     }
 
     /// Builds a directed graph from a text file with edges in the format "tail head"
-    pub fn build_from_file<P: AsRef<Path>>(file_path: P) -> Result<Self, GraphError> {
+    pub fn build_from_file<P: AsRef<Path>>(
+        file_path: P,
+        reversed: bool,
+    ) -> Result<Self, GraphError> {
         let mut graph = DirectedGraph::new();
 
         // Track maximum vertex index to know how many vertices to add
@@ -443,7 +429,9 @@ impl DirectedGraph {
             while graph.vertices.len() <= max_vertex_index {
                 graph.add_vertex();
             }
-
+            if reversed {
+                (tail, head) = (head, tail) // swap head and tail to reverse the graph
+            }
             // Add edge to the graph
             graph.add_edge(tail, head)?;
         }
@@ -597,7 +585,7 @@ mod tests {
         graph.add_edge(3, 4).unwrap();
 
         // Perform topological sort
-        let topo_sort_result = graph.topo_sort();
+        let topo_sort_result = graph.topo_sort(false);
 
         // Verify the result
         // Expected order: 0, 1, 2, 3, 4 or any valid topological order
@@ -634,7 +622,7 @@ mod tests {
         writeln!(file, "4 1").unwrap();
 
         // Build the graph from the file
-        let graph = DirectedGraph::build_from_file(&path).expect("Failed to build graph");
+        let graph = DirectedGraph::build_from_file(&path, false).expect("Failed to build graph");
 
         // Check vertices
         assert_eq!(graph.vertices.len(), 4); // Max index is 4, so 5 vertices (0 through 4)

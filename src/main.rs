@@ -2,9 +2,9 @@ use std::collections::HashMap;
 
 use algorithms_illuminated::graph::DirectedGraph;
 fn main() {
-    let graph = DirectedGraph::build_from_file("src/graph/txt/scc_example_8_16.txt").unwrap();
+    let graph = DirectedGraph::build_from_file("src/graph/txt/scc_example_8_16.txt", true).unwrap();
     graph.print_graph();
-    let scc = graph.reversed_topo_sort();
+    let scc = graph.kosaraju();
     // let counts = count_and_sort_top_five(scc);
 
     println!("{:?}", scc);
