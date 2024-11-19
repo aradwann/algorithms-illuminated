@@ -86,9 +86,9 @@ impl DirectedGraph {
         head_index: VertexIndex,
     ) -> Result<(), GraphError> {
         // Check for self-loop
-        if tail_index == head_index {
-            return Err(GraphError::SelfLoop);
-        }
+        // if tail_index == head_index {
+        //     return Err(GraphError::SelfLoop);
+        // }
 
         // Ensure tail and head are valid indices in the graph
         if tail_index >= self.vertices.len() || head_index >= self.vertices.len() {

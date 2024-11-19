@@ -2,15 +2,15 @@ use std::collections::HashMap;
 
 use algorithms_illuminated::graph::DirectedGraph;
 fn main() {
-    let graph = DirectedGraph::build_from_file("src/graph/txt/scc_example_8_16.txt", true).unwrap();
+    let graph = DirectedGraph::build_from_file("src/graph/txt/scc_test5.txt", true).unwrap();
     graph.print_graph();
     let scc = graph.kosaraju();
-    // let counts = count_and_sort_top_five(scc);
+    let counts = count_and_sort_top_five(scc);
 
-    println!("{:?}", scc);
+    println!("{:?}", counts);
 }
 
-fn _count_and_sort_top_five(vec: Vec<usize>) -> Vec<(usize, usize)> {
+fn count_and_sort_top_five(vec: Vec<usize>) -> Vec<(usize, usize)> {
     let mut counts = HashMap::new();
 
     // Count occurrences
