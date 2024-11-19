@@ -197,7 +197,7 @@ impl DirectedGraph {
         for v in vertices {
             let vertex_index = &v.borrow().get_index();
             if !visited_set.contains(vertex_index) {
-                self.dfs_topo_iterative(
+                self._dfs_topo_iterative(
                     *vertex_index,
                     &mut visited_set,
                     &mut topological_sort,
@@ -206,7 +206,6 @@ impl DirectedGraph {
                 );
             }
         }
-        // topological_sort
 
         let mut sorted_vertices: Vec<(usize, usize)> = topological_sort
             .iter()
@@ -283,7 +282,7 @@ impl DirectedGraph {
     }
 
     // alternate implmentation to avoid stack overflow
-    fn dfs_topo_iterative(
+    fn _dfs_topo_iterative(
         &self,
         vertex_index: VertexIndex,
         visited: &mut HashSet<usize>,
@@ -291,39 +290,44 @@ impl DirectedGraph {
         current_label: &mut usize,
         reversed: bool,
     ) {
-        // Mark the current vertex as visited
-        visited.insert(vertex_index);
-        let mut stack: Vec<usize> = Vec::new();
-        stack.push(vertex_index);
+        let mut stack: Vec<(VertexIndex, bool)> = Vec::new();
+        stack.push((vertex_index, false));
 
-        if !reversed {
-            while let Some(current) = stack.pop() {
-                if !visited.contains(&current) {
-                    visited.insert(current);
+        while let Some((current_vertex_index, processed)) = stack.pop() {
+            if processed {
+                // Post-processing step
+                topological_sort[current_vertex_index] = *current_label;
+                *current_label -= 1;
+                continue;
+            }
 
-                    let vertex = self.vertices.get(current).unwrap();
+            if visited.contains(&current_vertex_index) {
+                continue;
+            }
 
-                    for neighbor in &vertex.borrow().outgoing_edges {
-                        let neighbor_index = neighbor.borrow().get_index();
-                        stack.push(neighbor_index);
-                        topological_sort[vertex_index] = *current_label;
-                        *current_label -= 1;
+            // Mark the current vertex as visited
+            visited.insert(current_vertex_index);
+
+            // Push the current vertex back onto the stack for post-processing
+            stack.push((current_vertex_index, true));
+
+            let vertex = self.vertices.get(current_vertex_index).unwrap();
+
+            if !reversed {
+                // Push unvisited neighbors (outgoing edges) onto the stack
+                for neighbor in &vertex.borrow().outgoing_edges {
+                    let neighbor_index = neighbor.borrow().get_index();
+                    if !visited.contains(&neighbor_index) {
+                        stack.push((neighbor_index, false));
                     }
                 }
-            }
-        } else {
-            while let Some(current) = stack.pop() {
-                if !visited.contains(&current) {
-                    visited.insert(current);
-
-                    let vertex = self.vertices.get(current).unwrap();
-
-                    for neighbor_weak in &vertex.borrow().incoming_edges {
-                        if let Some(neigbor_rc) = neighbor_weak.upgrade() {
-                            let neighbor_index = neigbor_rc.borrow().get_index();
-                            stack.push(neighbor_index);
-                            topological_sort[vertex_index] = *current_label;
-                            *current_label -= 1;
+            } else {
+                // Push unvisited incoming vertices onto the stack
+                for neighbor_weak in &vertex.borrow().incoming_edges {
+                    if let Some(neighbor_rc) = neighbor_weak.upgrade() {
+                        let neighbor_index = neighbor_rc.borrow().get_index();
+                        if !visited.contains(&neighbor_index) {
+                            stack.push((neighbor_index, false));
                         }
                     }
                 }

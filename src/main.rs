@@ -3,10 +3,10 @@ use std::collections::HashMap;
 use algorithms_illuminated::graph::DirectedGraph;
 fn main() {
     let graph = DirectedGraph::build_from_file("src/graph/txt/scc_test1.txt", true).unwrap();
-    graph.print_graph();
-    let scc = graph.kosaraju();
+    // graph.print_graph();
+    let scc: Vec<usize> = graph.kosaraju();
     let counts = count_and_sort_top_five(scc);
-
+    // let counts: Vec<(usize, usize)> = graph.topo_sort(true);
     println!("{:?}", counts);
 }
 
