@@ -197,7 +197,7 @@ impl DirectedGraph {
         for v in vertices {
             let vertex_index = &v.borrow().get_index();
             if !visited_set.contains(vertex_index) {
-                self.dfs_topo(
+                self.dfs_topo_iterative(
                     *vertex_index,
                     &mut visited_set,
                     &mut topological_sort,
@@ -231,7 +231,7 @@ impl DirectedGraph {
     ///         DFS-Topo(G,v)
     /// f(s) := curLabel    // s's position in ordering
     /// curLabel := curLabel -1 // work right-to-left
-    fn dfs_topo(
+    fn _dfs_topo(
         &self,
         vertex_index: VertexIndex,
         visited: &mut HashSet<usize>,
@@ -249,7 +249,7 @@ impl DirectedGraph {
             for neighbor in &vertex.borrow().outgoing_edges {
                 let neighbor_index = neighbor.borrow().get_index();
                 if !visited.contains(&neighbor_index) {
-                    self.dfs_topo(
+                    self._dfs_topo(
                         neighbor_index,
                         visited,
                         topological_sort,
@@ -266,7 +266,7 @@ impl DirectedGraph {
                     let neighbor_index = neighbor_rc.borrow().get_index();
                     if !visited.contains(&neighbor_index) {
                         // Visit the incoming vertex
-                        self.dfs_topo(
+                        self._dfs_topo(
                             neighbor_index,
                             visited,
                             topological_sort,
@@ -280,6 +280,55 @@ impl DirectedGraph {
 
         topological_sort[vertex_index] = *current_label;
         *current_label -= 1;
+    }
+
+    // alternate implmentation to avoid stack overflow
+    fn dfs_topo_iterative(
+        &self,
+        vertex_index: VertexIndex,
+        visited: &mut HashSet<usize>,
+        topological_sort: &mut TopologicalSort,
+        current_label: &mut usize,
+        reversed: bool,
+    ) {
+        // Mark the current vertex as visited
+        visited.insert(vertex_index);
+        let mut stack: Vec<usize> = Vec::new();
+        stack.push(vertex_index);
+
+        if !reversed {
+            while let Some(current) = stack.pop() {
+                if !visited.contains(&current) {
+                    visited.insert(current);
+
+                    let vertex = self.vertices.get(current).unwrap();
+
+                    for neighbor in &vertex.borrow().outgoing_edges {
+                        let neighbor_index = neighbor.borrow().get_index();
+                        stack.push(neighbor_index);
+                        topological_sort[vertex_index] = *current_label;
+                        *current_label -= 1;
+                    }
+                }
+            }
+        } else {
+            while let Some(current) = stack.pop() {
+                if !visited.contains(&current) {
+                    visited.insert(current);
+
+                    let vertex = self.vertices.get(current).unwrap();
+
+                    for neighbor_weak in &vertex.borrow().incoming_edges {
+                        if let Some(neigbor_rc) = neighbor_weak.upgrade() {
+                            let neighbor_index = neigbor_rc.borrow().get_index();
+                            stack.push(neighbor_index);
+                            topological_sort[vertex_index] = *current_label;
+                            *current_label -= 1;
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /// Kosaraju Pseudocode
