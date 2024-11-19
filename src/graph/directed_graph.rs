@@ -85,6 +85,7 @@ impl DirectedGraph {
         tail_index: VertexIndex,
         head_index: VertexIndex,
     ) -> Result<(), GraphError> {
+        // Comment out the check to solve the scc.text
         // Check for self-loop
         // if tail_index == head_index {
         //     return Err(GraphError::SelfLoop);
@@ -115,7 +116,7 @@ impl DirectedGraph {
 
         Ok(())
     }
-
+    /// NOTE: if used for big graph will trigger stack overflow
     pub fn dfs_recursive(&self, start: VertexIndex) -> Result<Vec<usize>, GraphError> {
         let mut visited: HashSet<usize> = HashSet::new();
         let mut dfs_order = Vec::new();
@@ -144,7 +145,7 @@ impl DirectedGraph {
 
         // Recurse for unvisited neighbors
         for neighbor in &vertex.borrow().outgoing_edges {
-            let neighbor_index = neighbor.borrow().index;
+            let neighbor_index = neighbor.borrow().get_index();
             if !visited.contains(&neighbor_index) {
                 self.dfs_recursive_subroutine(neighbor_index, visited, order)?;
             }
@@ -154,7 +155,30 @@ impl DirectedGraph {
         order.push(start);
         Ok(order.to_vec())
     }
+    pub fn dfs_iterative(&self, start: VertexIndex) -> Result<Vec<VertexIndex>, GraphError> {
+        let mut visited = HashSet::new();
+        let mut stack = Vec::new();
+        let mut dfs_order = Vec::new();
+        stack.push(start);
 
+        while let Some(current) = stack.pop() {
+            if !visited.contains(&current) {
+                visited.insert(current);
+                dfs_order.push(current);
+                let vertex = self
+                    .vertices
+                    .get(current)
+                    .ok_or(GraphError::VertexNotFound)?;
+
+                for neighbor in &vertex.borrow().outgoing_edges {
+                    let neighbor_index = neighbor.borrow().get_index();
+                    stack.push(neighbor_index);
+                }
+            }
+        }
+
+        Ok(dfs_order)
+    }
     /// TopoSort Pseudocode
     /// Input: directed acyclic graph G= (V, E) in adjancency list representation
     /// postcondition: the f-values of vertices constitute a topological ordering of G.
@@ -487,19 +511,19 @@ mod tests {
         assert_eq!(graph.vertices[0].borrow().outgoing_edges.len(), 1);
         assert_eq!(graph.vertices[1].borrow().incoming_edges.len(), 1);
     }
+    // Comment out the test to solve the scc.text
+    // #[test]
+    // fn test_add_edge_self_loop() {
+    //     let graph = DirectedGraph::with_vertices(1);
 
-    #[test]
-    fn test_add_edge_self_loop() {
-        let graph = DirectedGraph::with_vertices(1);
+    //     // Try to add a self-loop from vertex 0 to itself
+    //     let result = graph.add_edge(0, 0);
+    //     assert_eq!(result, Err(GraphError::SelfLoop));
 
-        // Try to add a self-loop from vertex 0 to itself
-        let result = graph.add_edge(0, 0);
-        assert_eq!(result, Err(GraphError::SelfLoop));
-
-        // Ensure no edges were added
-        assert_eq!(graph.vertices[0].borrow().outgoing_edges.len(), 0);
-        assert_eq!(graph.vertices[0].borrow().incoming_edges.len(), 0);
-    }
+    //     // Ensure no edges were added
+    //     assert_eq!(graph.vertices[0].borrow().outgoing_edges.len(), 0);
+    //     assert_eq!(graph.vertices[0].borrow().incoming_edges.len(), 0);
+    // }
 
     #[test]
     fn test_add_edge_parallel_edge() {
@@ -564,6 +588,22 @@ mod tests {
         graph.add_edge(2, 3).unwrap();
 
         let mut dfs_order = graph.dfs_recursive(0).unwrap();
+
+        dfs_order.sort(); // sort as bfs orders isn't guranteed to be the same every run
+        let expected_order: Vec<usize> = vec![0, 1, 2, 3];
+        // this test essentially ensures that all vertices are explored
+        assert_eq!(dfs_order, expected_order);
+    }
+    #[test]
+    fn test_dfs_iterative_traversal() {
+        let graph = DirectedGraph::with_vertices(4);
+
+        graph.add_edge(0, 1).unwrap();
+        graph.add_edge(0, 2).unwrap();
+        graph.add_edge(1, 3).unwrap();
+        graph.add_edge(2, 3).unwrap();
+
+        let mut dfs_order = graph.dfs_iterative(0).unwrap();
 
         dfs_order.sort(); // sort as bfs orders isn't guranteed to be the same every run
         let expected_order: Vec<usize> = vec![0, 1, 2, 3];
