@@ -405,7 +405,7 @@ impl DirectedGraph {
     fn _dfs_scc_iterative(
         &self,
         vertex_index: usize,
-        scc_vec: &mut Vec<usize>,
+        scc_vec: &mut [usize],
         num_scc: usize,
         visited: &mut HashSet<usize>,
     ) {
