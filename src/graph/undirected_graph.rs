@@ -1,12 +1,12 @@
 use std::collections::{HashMap, HashSet};
 
-use super::{Graph, GraphError, VertexIndex};
+use super::{Graph, GraphError, Length, VertexIndex};
 use std::collections::VecDeque;
 
 #[derive(Debug, PartialEq)]
 struct Vertex {
     index: VertexIndex,
-    pub edges: Vec<VertexIndex>,
+    pub edges: Vec<(VertexIndex, Length)>,
 }
 
 impl Vertex {
@@ -35,20 +35,28 @@ impl Graph for UndirectedGraph {
         self.vertices.push(Vertex::new(self.vertices.len()));
     }
 
-    fn add_edge(&mut self, from: VertexIndex, to: VertexIndex) -> Result<(), GraphError> {
+    fn add_edge(
+        &mut self,
+        from: VertexIndex,
+        to: VertexIndex,
+        length: Length,
+    ) -> Result<(), GraphError> {
         if from == to {
             return Err(GraphError::SelfLoop);
         }
         if !self.is_valid_vertex(from) || !self.is_valid_vertex(to) {
             return Err(GraphError::VertexNotFound);
         }
-        if self.vertices[from].edges.contains(&to) {
+        if self.vertices[from].edges.iter().any(|&(v, _)| v == to) {
             return Err(GraphError::ParallelEdge);
         }
 
-        self.vertices[from].edges.push(to);
-        self.vertices[to].edges.push(from);
+        self.vertices[from].edges.push((to, length));
+        self.vertices[to].edges.push((from, length));
         Ok(())
+    }
+    fn add_unit_edge(&mut self, from: VertexIndex, to: VertexIndex) -> Result<(), GraphError> {
+        self.add_edge(from, to, 1)
     }
 }
 impl UndirectedGraph {
@@ -83,7 +91,7 @@ impl UndirectedGraph {
 
         while let Some(current) = queue.pop_front() {
             result.push(current);
-            for &neighbor in &self.vertices[current].edges {
+            for &(neighbor, _) in &self.vertices[current].edges {
                 if visited.insert(neighbor) {
                     queue.push_back(neighbor);
                 }
@@ -122,7 +130,7 @@ impl UndirectedGraph {
 
         while let Some(current) = queue.pop_front() {
             let current_distance = distances[&current];
-            for &neighbor in &self.vertices[current].edges {
+            for &(neighbor, _) in &self.vertices[current].edges {
                 if *distances.entry(neighbor).or_insert(current_distance + 1)
                     == &current_distance + 1
                 {
@@ -168,7 +176,7 @@ impl UndirectedGraph {
                         .entry(component_id)
                         .or_insert_with(Vec::new)
                         .push(current);
-                    for &neighbor in &self.vertices[current].edges {
+                    for &(neighbor, _) in &self.vertices[current].edges {
                         if visited.insert(neighbor) {
                             queue.push_back(neighbor);
                         }
@@ -206,7 +214,7 @@ impl UndirectedGraph {
         while let Some(current) = stack.pop() {
             if visited.insert(current) {
                 result.push(current);
-                for &neighbor in self.vertices[current].edges.iter().rev() {
+                for &(neighbor, _) in self.vertices[current].edges.iter().rev() {
                     stack.push(neighbor);
                 }
             }
@@ -237,7 +245,7 @@ impl UndirectedGraph {
 
         visited.insert(start);
 
-        for &neighbor in &self.vertices[start].edges {
+        for &(neighbor, _) in &self.vertices[start].edges {
             if visited.insert(neighbor) {
                 self.dfs_recursive(neighbor, visited, dfs_order)?;
             }
@@ -245,6 +253,24 @@ impl UndirectedGraph {
 
         dfs_order.push(start);
         Ok(dfs_order.to_vec())
+    }
+
+    /// Dijkstra Pseudocode
+    /// Input: directed graph G= (V, E) in adjancency list representation and a vertex s ∈ V,
+    ///        a length le >= 0 for each e ∈ E
+    /// postcondition: for every vertex v, the value len(v)
+    ///                equals the true shortest-path distance dist(s,v)
+    /// -------------------------------------------------------------------------------------
+    /// // Initialization
+    /// X := {s}
+    /// len(s) := 0, len(v) := +∞ for every v != s
+    /// // Main loop
+    /// while there is an edge (v,w) with v ∈ X, w ∉ X do
+    ///     (v*,w*) := such an edge minimizing len(v) + lvw
+    ///     add w* to X
+    ///     len(w*) := len(v*) + lv*w*
+    pub fn dijkstra(&self) {
+        todo!()
     }
 
     /// Validates if a vertex index exists
@@ -275,9 +301,9 @@ mod tests {
         let mut graph = UndirectedGraph::new();
         graph.add_vertex();
         graph.add_vertex();
-        graph.add_edge(0, 1).unwrap();
-        assert_eq!(graph.vertices[0].edges, vec![1]);
-        assert_eq!(graph.vertices[1].edges, vec![0]);
+        graph.add_unit_edge(0, 1).unwrap();
+        assert_eq!(graph.vertices[0].edges, vec![(1, 1)]);
+        assert_eq!(graph.vertices[1].edges, vec![(0, 1)]);
     }
 
     #[test]
@@ -285,10 +311,10 @@ mod tests {
         let mut graph = UndirectedGraph::new();
         graph.add_vertex();
         graph.add_vertex();
-        let _ = graph.add_edge(0, 1);
+        let _ = graph.add_unit_edge(0, 1);
 
         // Attempt to add a parallel edge
-        let result = graph.add_edge(0, 1);
+        let result = graph.add_unit_edge(0, 1);
         assert_eq!(result, Err(GraphError::ParallelEdge));
     }
 
@@ -298,7 +324,7 @@ mod tests {
         graph.add_vertex();
 
         // Attempt to add a self-loop
-        let result = graph.add_edge(0, 0);
+        let result = graph.add_unit_edge(0, 0);
         assert_eq!(result, Err(GraphError::SelfLoop));
     }
 
@@ -310,10 +336,10 @@ mod tests {
         graph.add_vertex();
         graph.add_vertex();
         graph.add_vertex();
-        let _ = graph.add_edge(0, 1);
-        let _ = graph.add_edge(0, 2);
-        let _ = graph.add_edge(1, 3);
-        let _ = graph.add_edge(2, 4);
+        let _ = graph.add_unit_edge(0, 1);
+        let _ = graph.add_unit_edge(0, 2);
+        let _ = graph.add_unit_edge(1, 3);
+        let _ = graph.add_unit_edge(2, 4);
 
         let mut bfs_result = graph.bfs(0).unwrap();
         bfs_result.sort(); // sort as bfs orders isn't guranteed to be the same every run
@@ -332,13 +358,13 @@ mod tests {
         graph.add_vertex();
         graph.add_vertex();
 
-        graph.add_edge(0, 1).unwrap();
-        graph.add_edge(0, 2).unwrap();
-        graph.add_edge(1, 3).unwrap();
-        graph.add_edge(2, 3).unwrap();
-        graph.add_edge(2, 4).unwrap();
-        graph.add_edge(3, 4).unwrap();
-        graph.add_edge(3, 5).unwrap();
+        graph.add_unit_edge(0, 1).unwrap();
+        graph.add_unit_edge(0, 2).unwrap();
+        graph.add_unit_edge(1, 3).unwrap();
+        graph.add_unit_edge(2, 3).unwrap();
+        graph.add_unit_edge(2, 4).unwrap();
+        graph.add_unit_edge(3, 4).unwrap();
+        graph.add_unit_edge(3, 5).unwrap();
 
         let mut bfs_result = graph.dfs_iterative(0).unwrap();
         bfs_result.sort(); // sort as bfs orders isn't guranteed to be the same every run
@@ -357,13 +383,13 @@ mod tests {
         graph.add_vertex();
         graph.add_vertex();
 
-        graph.add_edge(0, 1).unwrap();
-        graph.add_edge(0, 2).unwrap();
-        graph.add_edge(1, 3).unwrap();
-        graph.add_edge(2, 3).unwrap();
-        graph.add_edge(2, 4).unwrap();
-        graph.add_edge(3, 4).unwrap();
-        graph.add_edge(3, 5).unwrap();
+        graph.add_unit_edge(0, 1).unwrap();
+        graph.add_unit_edge(0, 2).unwrap();
+        graph.add_unit_edge(1, 3).unwrap();
+        graph.add_unit_edge(2, 3).unwrap();
+        graph.add_unit_edge(2, 4).unwrap();
+        graph.add_unit_edge(3, 4).unwrap();
+        graph.add_unit_edge(3, 5).unwrap();
 
         let mut visited: HashSet<usize> = HashSet::new();
         let mut dfs_order = Vec::new();
@@ -386,8 +412,8 @@ mod tests {
         graph.add_vertex();
         graph.add_vertex();
 
-        let _ = graph.add_edge(0, 1);
-        let _ = graph.add_edge(1, 2);
+        let _ = graph.add_unit_edge(0, 1);
+        let _ = graph.add_unit_edge(1, 2);
 
         let bfs_result = graph.bfs(0).unwrap();
         let expected_order = vec![0, 1, 2];
@@ -412,13 +438,13 @@ mod tests {
         graph.add_vertex();
         graph.add_vertex();
 
-        graph.add_edge(0, 1).unwrap();
-        graph.add_edge(0, 2).unwrap();
-        graph.add_edge(1, 3).unwrap();
-        graph.add_edge(2, 3).unwrap();
-        graph.add_edge(2, 4).unwrap();
-        graph.add_edge(3, 4).unwrap();
-        graph.add_edge(3, 5).unwrap();
+        graph.add_unit_edge(0, 1).unwrap();
+        graph.add_unit_edge(0, 2).unwrap();
+        graph.add_unit_edge(1, 3).unwrap();
+        graph.add_unit_edge(2, 3).unwrap();
+        graph.add_unit_edge(2, 4).unwrap();
+        graph.add_unit_edge(3, 4).unwrap();
+        graph.add_unit_edge(3, 5).unwrap();
 
         let shortest_paths = graph.shortest_path_bfs(0).unwrap();
 
@@ -454,8 +480,8 @@ mod tests {
         graph.add_vertex();
         graph.add_vertex();
 
-        graph.add_edge(0, 1).unwrap();
-        graph.add_edge(2, 3).unwrap();
+        graph.add_unit_edge(0, 1).unwrap();
+        graph.add_unit_edge(2, 3).unwrap();
 
         let shortest_paths = graph.shortest_path_bfs(0).unwrap();
 
@@ -482,14 +508,14 @@ mod tests {
         graph.add_vertex();
         graph.add_vertex();
 
-        graph.add_edge(0, 4).unwrap();
-        graph.add_edge(0, 2).unwrap();
-        graph.add_edge(1, 3).unwrap();
-        graph.add_edge(2, 4).unwrap();
-        graph.add_edge(4, 6).unwrap();
-        graph.add_edge(4, 8).unwrap();
-        graph.add_edge(5, 7).unwrap();
-        graph.add_edge(5, 9).unwrap();
+        graph.add_unit_edge(0, 4).unwrap();
+        graph.add_unit_edge(0, 2).unwrap();
+        graph.add_unit_edge(1, 3).unwrap();
+        graph.add_unit_edge(2, 4).unwrap();
+        graph.add_unit_edge(4, 6).unwrap();
+        graph.add_unit_edge(4, 8).unwrap();
+        graph.add_unit_edge(5, 7).unwrap();
+        graph.add_unit_edge(5, 9).unwrap();
 
         let connected_components = graph.connected_components();
 

@@ -133,9 +133,9 @@ impl DirectedGraph {
     fn dfs_recursive_subroutine(
         &self,
         start: VertexIndex,
-        visited: &mut HashSet<usize>,
-        order: &mut Vec<usize>,
-    ) -> Result<Vec<usize>, GraphError> {
+        visited: &mut HashSet<VertexIndex>,
+        order: &mut Vec<VertexIndex>,
+    ) -> Result<Vec<VertexIndex>, GraphError> {
         // Ensure the starting vertex exists
         let vertex = self.vertices.get(start).ok_or(GraphError::VertexNotFound)?;
 
@@ -187,7 +187,7 @@ impl DirectedGraph {
     /// for every v ∈ V do
     ///     if v is unexplored then // in a prior DFS
     ///         DFS-Topo(G, v)
-    pub fn topo_sort(&self, reversed: bool) -> Vec<(usize, usize)> {
+    pub fn topo_sort(&self, reversed: bool) -> Vec<(usize, VertexIndex)> {
         let vertices = &self.vertices;
         let vertcies_num = vertices.len();
         let mut current_label = vertcies_num;
@@ -206,7 +206,7 @@ impl DirectedGraph {
             }
         }
 
-        let mut sorted_vertices: Vec<(usize, usize)> = topological_sort
+        let mut sorted_vertices: Vec<(usize, VertexIndex)> = topological_sort
             .iter()
             .enumerate() // Produces (index, &label)
             .map(|(index, &label)| (label, index))
@@ -232,7 +232,7 @@ impl DirectedGraph {
     fn _dfs_topo(
         &self,
         vertex_index: VertexIndex,
-        visited: &mut HashSet<usize>,
+        visited: &mut HashSet<VertexIndex>,
         topological_sort: &mut TopologicalSort,
         current_label: &mut usize,
         reversed: bool,
@@ -284,7 +284,7 @@ impl DirectedGraph {
     fn _dfs_topo_iterative(
         &self,
         vertex_index: VertexIndex,
-        visited: &mut HashSet<usize>,
+        visited: &mut HashSet<VertexIndex>,
         topological_sort: &mut TopologicalSort,
         current_label: &mut usize,
         reversed: bool,
@@ -384,7 +384,7 @@ impl DirectedGraph {
     ///
     fn _dfs_scc(
         &self,
-        vertex_index: usize,
+        vertex_index: VertexIndex,
         scc_vec: &mut Vec<usize>,
         num_scc: usize,
         visted_set: &mut HashSet<usize>,
@@ -403,7 +403,7 @@ impl DirectedGraph {
 
     fn _dfs_scc_iterative(
         &self,
-        vertex_index: usize,
+        vertex_index: VertexIndex,
         scc_vec: &mut [usize],
         num_scc: usize,
         visited: &mut HashSet<usize>,
@@ -461,40 +461,7 @@ impl DirectedGraph {
     // ///     (v*,w*) := such an edge minimizing len(v) + lvw
     // ///     add w* to X
     // ///     len(w*) := len(v*) + lv*w*
-    // pub fn dijkstra(&self, s: &VertexRc, num_scc: &mut usize) {
-    //     s.borrow_mut().explored = true;
-    //     s.borrow_mut().scc = Some(*num_scc);
-
-    //     for v in &s.borrow().outgoing_edges {
-    //         if !v.destination.borrow().explored {
-    //             self.dfs_topo(&v.destination, num_scc);
-    //         }
-    //     }
-    // }
-
-    // ////////////////// helpers /////////////////////
-    // fn has_cycle(&self) -> bool {
-    //     for vertex in &self.vertices {
-    //         if self.detect_cycle(vertex, &mut vec![false; self.vertices.len()]) {
-    //             return true;
-    //         }
-    //     }
-    //     false
-    // }
-
-    // fn detect_cycle(&self, vertex: &VertexRc, visited: &mut Vec<bool>) -> bool {
-    //     let vertex_index = self.get_vertex_index(vertex);
-    //     if visited[vertex_index] {
-    //         return true;
-    //     }
-    //     visited[vertex_index] = true;
-    //     for edge in &vertex.borrow().outgoing_edges {
-    //         if self.detect_cycle(&edge.destination, visited) {
-    //             return true;
-    //         }
-    //     }
-    //     visited[vertex_index] = false;
-    //     false
+    // pub fn dijkstra(&self, s: VertexIndex, ) {
     // }
 
     pub fn print_graph(&self) {
