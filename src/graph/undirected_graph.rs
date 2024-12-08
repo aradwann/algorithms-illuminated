@@ -32,37 +32,25 @@ pub struct UndirectedGraph {
 
 impl Graph for UndirectedGraph {
     fn add_vertex(&mut self) {
-        let vertex = Vertex::new(self.vertices.len());
-        self.vertices.push(vertex);
+        self.vertices.push(Vertex::new(self.vertices.len()));
     }
+
     fn add_edge(&mut self, from: VertexIndex, to: VertexIndex) -> Result<(), GraphError> {
         if from == to {
             return Err(GraphError::SelfLoop);
         }
-
-        if let Some(from_vertex) = self.vertices.get_mut(from) {
-            if from_vertex.edges.contains(&to) {
-                return Err(GraphError::ParallelEdge);
-            }
-            from_vertex.edges.push(to);
-        } else {
+        if !self.is_valid_vertex(from) || !self.is_valid_vertex(to) {
             return Err(GraphError::VertexNotFound);
         }
-
-        if let Some(to_vertex) = self.vertices.get_mut(to) {
-            if to_vertex.edges.contains(&from) {
-                return Err(GraphError::ParallelEdge);
-            }
-            to_vertex.edges.push(from);
-        } else {
-            self.vertices.get_mut(from).unwrap().edges.remove(to);
-            return Err(GraphError::VertexNotFound);
+        if self.vertices[from].edges.contains(&to) {
+            return Err(GraphError::ParallelEdge);
         }
 
+        self.vertices[from].edges.push(to);
+        self.vertices[to].edges.push(from);
         Ok(())
     }
 }
-
 impl UndirectedGraph {
     pub fn new() -> Self {
         Self {
@@ -82,31 +70,27 @@ impl UndirectedGraph {
     ///             mark w as explored
     ///             add w to the end of Q
     pub fn bfs(&self, start: VertexIndex) -> Result<Vec<VertexIndex>, GraphError> {
-        if self.vertices.get(start).is_none() {
+        if !self.is_valid_vertex(start) {
             return Err(GraphError::VertexNotFound);
         }
 
         let mut visited = HashSet::new();
         let mut queue = VecDeque::new();
-        let mut bfs_order = Vec::new();
+        let mut result = Vec::new();
 
         queue.push_back(start);
         visited.insert(start);
 
         while let Some(current) = queue.pop_front() {
-            bfs_order.push(current);
-
-            if let Some(vertex) = self.vertices.get(current) {
-                for &neighbor in &vertex.edges {
-                    if !visited.contains(&neighbor) {
-                        visited.insert(neighbor);
-                        queue.push_back(neighbor);
-                    }
+            result.push(current);
+            for &neighbor in &self.vertices[current].edges {
+                if visited.insert(neighbor) {
+                    queue.push_back(neighbor);
                 }
             }
         }
 
-        Ok(bfs_order)
+        Ok(result)
     }
 
     /// Pseudocode
@@ -122,28 +106,28 @@ impl UndirectedGraph {
     ///         if w is unexplored then
     ///             mark w as explored
     ///             add w to the end of Q
-    pub fn shortest_path_bfs(&self, start: usize) -> Result<HashMap<usize, usize>, GraphError> {
-        // Ensure the starting vertex exists
-        if self.vertices.get(start).is_none() {
+    pub fn shortest_path_bfs(
+        &self,
+        start: VertexIndex,
+    ) -> Result<HashMap<VertexIndex, usize>, GraphError> {
+        if !self.is_valid_vertex(start) {
             return Err(GraphError::VertexNotFound);
         }
 
         let mut distances = HashMap::new();
         let mut queue = VecDeque::new();
 
-        // Initialize the BFS
         distances.insert(start, 0);
         queue.push_back(start);
 
         while let Some(current) = queue.pop_front() {
             let current_distance = distances[&current];
-
-            for neighbor in self.get_neighbors(current) {
-                // Add unvisited neighbors to the queue
-                distances.entry(neighbor).or_insert_with(|| {
+            for &neighbor in &self.vertices[current].edges {
+                if *distances.entry(neighbor).or_insert(current_distance + 1)
+                    == &current_distance + 1
+                {
                     queue.push_back(neighbor);
-                    current_distance + 1
-                });
+                }
             }
         }
 
@@ -168,32 +152,32 @@ impl UndirectedGraph {
     ///                 if w is unexplored then
     ///                     mark w as explored
     ///                     add w to the end of Q
-    pub fn ucc(&mut self) -> HashMap<usize, Vec<usize>> {
+    pub fn connected_components(&self) -> HashMap<usize, Vec<usize>> {
         let mut visited = HashSet::new();
-        let mut num_cc: usize = 0;
-        let mut connected_components = HashMap::new();
-        for v in self.vertices.iter() {
-            if !visited.contains(&v.index) {
-                num_cc += 1;
+        let mut components = HashMap::new();
+        let mut component_id = 0;
+
+        for vertex in &self.vertices {
+            if visited.insert(vertex.index) {
+                component_id += 1;
                 let mut queue = VecDeque::new();
-                queue.push_back(v.index);
-                visited.insert(v.index);
+                queue.push_back(vertex.index);
 
                 while let Some(current) = queue.pop_front() {
-                    let cc_vec = connected_components.entry(num_cc).or_insert_with(Vec::new);
-                    cc_vec.push(current);
-                    if let Some(vertex) = self.vertices.get(current) {
-                        for &neighbor in &vertex.edges {
-                            if !visited.contains(&neighbor) {
-                                visited.insert(neighbor);
-                                queue.push_back(neighbor);
-                            }
+                    components
+                        .entry(component_id)
+                        .or_insert_with(Vec::new)
+                        .push(current);
+                    for &neighbor in &self.vertices[current].edges {
+                        if visited.insert(neighbor) {
+                            queue.push_back(neighbor);
                         }
                     }
                 }
             }
         }
-        connected_components
+
+        components
     }
 
     /// DFS (iterative version) Pseudocode
@@ -209,27 +193,26 @@ impl UndirectedGraph {
     ///         for each edge (v,w) in v's adjancency list do
     ///             add("push") w to the front of S
     pub fn dfs_iterative(&self, start: VertexIndex) -> Result<Vec<VertexIndex>, GraphError> {
-        // Ensure the starting vertex exists
-        if self.vertices.get(start).is_none() {
+        if !self.is_valid_vertex(start) {
             return Err(GraphError::VertexNotFound);
         }
 
         let mut visited = HashSet::new();
         let mut stack = Vec::new();
-        let mut dfs_order = Vec::new();
+        let mut result = Vec::new();
+
         stack.push(start);
 
         while let Some(current) = stack.pop() {
-            if !visited.contains(&current) {
-                visited.insert(current);
-                dfs_order.push(current);
-                for v in self.get_neighbors(current) {
-                    stack.push(v);
+            if visited.insert(current) {
+                result.push(current);
+                for &neighbor in self.vertices[current].edges.iter().rev() {
+                    stack.push(neighbor);
                 }
             }
         }
 
-        Ok(dfs_order)
+        Ok(result)
     }
 
     /// DFS (recursive version) Pseudocode
@@ -244,7 +227,7 @@ impl UndirectedGraph {
     pub fn dfs_recursive(
         &self,
         start: VertexIndex,
-        visited_set: &mut HashSet<usize>,
+        visited: &mut HashSet<usize>,
         dfs_order: &mut Vec<usize>,
     ) -> Result<Vec<VertexIndex>, GraphError> {
         // Check if the starting vertex exists in the graph
@@ -252,13 +235,11 @@ impl UndirectedGraph {
             return Err(GraphError::VertexNotFound);
         }
 
-        // Mark the current vertex as visited
-        visited_set.insert(start);
+        visited.insert(start);
 
-        // Recurse for each unvisited neighbor
-        for neighbor in self.get_neighbors(start) {
-            if !visited_set.contains(&neighbor) {
-                self.dfs_recursive(neighbor, visited_set, dfs_order)?;
+        for &neighbor in &self.vertices[start].edges {
+            if visited.insert(neighbor) {
+                self.dfs_recursive(neighbor, visited, dfs_order)?;
             }
         }
 
@@ -266,10 +247,9 @@ impl UndirectedGraph {
         Ok(dfs_order.to_vec())
     }
 
-    fn get_neighbors(&self, index: VertexIndex) -> Vec<VertexIndex> {
-        self.vertices
-            .get(index)
-            .map_or(vec![], |v| v.edges.to_vec())
+    /// Validates if a vertex index exists
+    fn is_valid_vertex(&self, index: VertexIndex) -> bool {
+        index < self.vertices.len()
     }
 }
 
@@ -291,21 +271,13 @@ mod tests {
     }
 
     #[test]
-    fn undirected_graph_add_edge() {
+    fn test_add_edge() {
         let mut graph = UndirectedGraph::new();
         graph.add_vertex();
         graph.add_vertex();
-        let _ = graph.add_edge(0, 1);
-
-        let neighbors_1 = graph.get_neighbors(0);
-        let neighbors_2 = graph.get_neighbors(1);
-
-        assert_eq!(neighbors_1, vec![1]);
-        assert_eq!(
-            neighbors_2,
-            vec![0],
-            "In an undirected graph, edge should exist in both directions"
-        );
+        graph.add_edge(0, 1).unwrap();
+        assert_eq!(graph.vertices[0].edges, vec![1]);
+        assert_eq!(graph.vertices[1].edges, vec![0]);
     }
 
     #[test]
@@ -519,7 +491,7 @@ mod tests {
         graph.add_edge(5, 7).unwrap();
         graph.add_edge(5, 9).unwrap();
 
-        let connected_components = graph.ucc();
+        let connected_components = graph.connected_components();
 
         // Define the expected connected components based on the graph structure.
         // Here, we expect three connected components:
