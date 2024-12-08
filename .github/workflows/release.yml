@@ -1,0 +1,33 @@
+name: Release on Tag
+
+on:
+  push:
+    tags:
+      - 'v*' # Triggers on tags starting with "v"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build project
+        run: cargo build --release
+
+      - name: Package release
+        run: |
+          mkdir dist
+          tar -czf dist/algorithms-illuminated-v${{ github.ref_name }}.tar.gz -C target/release algorithms-illuminated
+
+      - name: Create GitHub Release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          body: |
+            ## Changes
+            - Automatically generated release for version ${{ github.ref_name }}.
+          draft: false
+          prerelease: false
+          artifacts: dist/algorithms-illuminated-v${{ github.ref_name }}.tar.gz
