@@ -3,17 +3,18 @@ use std::collections::{HashMap, HashSet};
 use super::{Graph, GraphError, VertexIndex};
 use std::collections::VecDeque;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 struct Vertex {
-    pub _value: char,
-    pub edges: HashSet<VertexIndex>,
+    index: VertexIndex,
+    pub edges: Vec<VertexIndex>,
 }
 
 impl Vertex {
-    fn new(value: char) -> Self {
+    /// Creates a new [`Vertex`].
+    fn new(index: VertexIndex) -> Self {
         Self {
-            _value: value,
-            edges: HashSet::new(),
+            edges: Vec::new(),
+            index, // NOTE: this is has to be updated if the graph vertices indexes are updated
         }
     }
 }
@@ -26,34 +27,35 @@ impl Vertex {
 ///
 /// An undirected graph represented using an adjacency list.
 pub struct UndirectedGraph {
-    vertices: HashMap<VertexIndex, Vertex>,
+    vertices: Vec<Vertex>,
 }
 
 impl Graph for UndirectedGraph {
-    fn add_vertex(&mut self, index: VertexIndex, value: char) {
-        self.vertices.insert(index, Vertex::new(value));
+    fn add_vertex(&mut self) {
+        let vertex = Vertex::new(self.vertices.len());
+        self.vertices.push(vertex);
     }
     fn add_edge(&mut self, from: VertexIndex, to: VertexIndex) -> Result<(), GraphError> {
         if from == to {
             return Err(GraphError::SelfLoop);
         }
 
-        if let Some(from_vertex) = self.vertices.get_mut(&from) {
+        if let Some(from_vertex) = self.vertices.get_mut(from) {
             if from_vertex.edges.contains(&to) {
                 return Err(GraphError::ParallelEdge);
             }
-            from_vertex.edges.insert(to);
+            from_vertex.edges.push(to);
         } else {
             return Err(GraphError::VertexNotFound);
         }
 
-        if let Some(to_vertex) = self.vertices.get_mut(&to) {
+        if let Some(to_vertex) = self.vertices.get_mut(to) {
             if to_vertex.edges.contains(&from) {
                 return Err(GraphError::ParallelEdge);
             }
-            to_vertex.edges.insert(from);
+            to_vertex.edges.push(from);
         } else {
-            self.vertices.get_mut(&from).unwrap().edges.remove(&to);
+            self.vertices.get_mut(from).unwrap().edges.remove(to);
             return Err(GraphError::VertexNotFound);
         }
 
@@ -64,7 +66,7 @@ impl Graph for UndirectedGraph {
 impl UndirectedGraph {
     pub fn new() -> Self {
         Self {
-            vertices: HashMap::new(),
+            vertices: Vec::new(),
         }
     }
     /// Pseudocode
@@ -80,7 +82,7 @@ impl UndirectedGraph {
     ///             mark w as explored
     ///             add w to the end of Q
     pub fn bfs(&self, start: VertexIndex) -> Result<Vec<VertexIndex>, GraphError> {
-        if !self.vertices.contains_key(&start) {
+        if self.vertices.get(start).is_none() {
             return Err(GraphError::VertexNotFound);
         }
 
@@ -94,7 +96,7 @@ impl UndirectedGraph {
         while let Some(current) = queue.pop_front() {
             bfs_order.push(current);
 
-            if let Some(vertex) = self.vertices.get(&current) {
+            if let Some(vertex) = self.vertices.get(current) {
                 for &neighbor in &vertex.edges {
                     if !visited.contains(&neighbor) {
                         visited.insert(neighbor);
@@ -122,7 +124,7 @@ impl UndirectedGraph {
     ///             add w to the end of Q
     pub fn shortest_path_bfs(&self, start: usize) -> Result<HashMap<usize, usize>, GraphError> {
         // Ensure the starting vertex exists
-        if !self.vertices.contains_key(&start) {
+        if self.vertices.get(start).is_none() {
             return Err(GraphError::VertexNotFound);
         }
 
@@ -170,17 +172,17 @@ impl UndirectedGraph {
         let mut visited = HashSet::new();
         let mut num_cc: usize = 0;
         let mut connected_components = HashMap::new();
-        for (&v, _) in self.vertices.iter() {
-            if !visited.contains(&v) {
+        for v in self.vertices.iter() {
+            if !visited.contains(&v.index) {
                 num_cc += 1;
                 let mut queue = VecDeque::new();
-                queue.push_back(v);
-                visited.insert(v);
+                queue.push_back(v.index);
+                visited.insert(v.index);
 
                 while let Some(current) = queue.pop_front() {
                     let cc_vec = connected_components.entry(num_cc).or_insert_with(Vec::new);
                     cc_vec.push(current);
-                    if let Some(vertex) = self.vertices.get(&current) {
+                    if let Some(vertex) = self.vertices.get(current) {
                         for &neighbor in &vertex.edges {
                             if !visited.contains(&neighbor) {
                                 visited.insert(neighbor);
@@ -207,7 +209,8 @@ impl UndirectedGraph {
     ///         for each edge (v,w) in v's adjancency list do
     ///             add("push") w to the front of S
     pub fn dfs_iterative(&self, start: VertexIndex) -> Result<Vec<VertexIndex>, GraphError> {
-        if !self.vertices.contains_key(&start) {
+        // Ensure the starting vertex exists
+        if self.vertices.get(start).is_none() {
             return Err(GraphError::VertexNotFound);
         }
 
@@ -245,7 +248,7 @@ impl UndirectedGraph {
         dfs_order: &mut Vec<usize>,
     ) -> Result<Vec<VertexIndex>, GraphError> {
         // Check if the starting vertex exists in the graph
-        if !self.vertices.contains_key(&start) {
+        if self.vertices.get(start).is_none() {
             return Err(GraphError::VertexNotFound);
         }
 
@@ -265,8 +268,8 @@ impl UndirectedGraph {
 
     fn get_neighbors(&self, index: VertexIndex) -> Vec<VertexIndex> {
         self.vertices
-            .get(&index)
-            .map_or(vec![], |v| v.edges.iter().cloned().collect())
+            .get(index)
+            .map_or(vec![], |v| v.edges.to_vec())
     }
 }
 
@@ -283,25 +286,24 @@ mod tests {
     #[test]
     fn undirected_graph_add_vertex() {
         let mut graph = UndirectedGraph::new();
-        graph.add_vertex(1, 'A');
-        assert!(graph.vertices.contains_key(&1));
-        assert_eq!(graph.vertices.get(&1).unwrap()._value, 'A');
+        graph.add_vertex();
+        assert!(!graph.vertices.is_empty());
     }
 
     #[test]
     fn undirected_graph_add_edge() {
         let mut graph = UndirectedGraph::new();
-        graph.add_vertex(1, 'A');
-        graph.add_vertex(2, 'B');
-        let _ = graph.add_edge(1, 2);
+        graph.add_vertex();
+        graph.add_vertex();
+        let _ = graph.add_edge(0, 1);
 
-        let neighbors_1 = graph.get_neighbors(1);
-        let neighbors_2 = graph.get_neighbors(2);
+        let neighbors_1 = graph.get_neighbors(0);
+        let neighbors_2 = graph.get_neighbors(1);
 
-        assert_eq!(neighbors_1, vec![2]);
+        assert_eq!(neighbors_1, vec![1]);
         assert_eq!(
             neighbors_2,
-            vec![1],
+            vec![0],
             "In an undirected graph, edge should exist in both directions"
         );
     }
@@ -309,41 +311,41 @@ mod tests {
     #[test]
     fn undirected_graph_add_parallel_edge() {
         let mut graph = UndirectedGraph::new();
-        graph.add_vertex(1, 'A');
-        graph.add_vertex(2, 'B');
-        let _ = graph.add_edge(1, 2);
+        graph.add_vertex();
+        graph.add_vertex();
+        let _ = graph.add_edge(0, 1);
 
         // Attempt to add a parallel edge
-        let result = graph.add_edge(1, 2);
+        let result = graph.add_edge(0, 1);
         assert_eq!(result, Err(GraphError::ParallelEdge));
     }
 
     #[test]
     fn undirected_graph_add_self_loop() {
         let mut graph = UndirectedGraph::new();
-        graph.add_vertex(1, 'A');
+        graph.add_vertex();
 
         // Attempt to add a self-loop
-        let result = graph.add_edge(1, 1);
+        let result = graph.add_edge(0, 0);
         assert_eq!(result, Err(GraphError::SelfLoop));
     }
 
     #[test]
     fn test_bfs_traversal() {
         let mut graph = UndirectedGraph::new();
-        graph.add_vertex(1, 'A');
-        graph.add_vertex(2, 'B');
-        graph.add_vertex(3, 'C');
-        graph.add_vertex(4, 'D');
-        graph.add_vertex(5, 'E');
-        let _ = graph.add_edge(1, 2);
+        graph.add_vertex();
+        graph.add_vertex();
+        graph.add_vertex();
+        graph.add_vertex();
+        graph.add_vertex();
+        let _ = graph.add_edge(0, 1);
+        let _ = graph.add_edge(0, 2);
         let _ = graph.add_edge(1, 3);
         let _ = graph.add_edge(2, 4);
-        let _ = graph.add_edge(3, 5);
 
-        let mut bfs_result = graph.bfs(1).unwrap();
+        let mut bfs_result = graph.bfs(0).unwrap();
         bfs_result.sort(); // sort as bfs orders isn't guranteed to be the same every run
-        let expected_order = vec![1, 2, 3, 4, 5];
+        let expected_order = vec![0, 1, 2, 3, 4];
         // this test essentially ensures that all vertices are explored
         assert_eq!(bfs_result, expected_order);
     }
@@ -351,12 +353,12 @@ mod tests {
     #[test]
     fn test_dfs_iterative_traversal() {
         let mut graph = UndirectedGraph::new();
-        graph.add_vertex(0, 'S');
-        graph.add_vertex(1, 'A');
-        graph.add_vertex(2, 'B');
-        graph.add_vertex(3, 'C');
-        graph.add_vertex(4, 'D');
-        graph.add_vertex(5, 'E');
+        graph.add_vertex();
+        graph.add_vertex();
+        graph.add_vertex();
+        graph.add_vertex();
+        graph.add_vertex();
+        graph.add_vertex();
 
         graph.add_edge(0, 1).unwrap();
         graph.add_edge(0, 2).unwrap();
@@ -376,12 +378,12 @@ mod tests {
     fn test_dfs_recursive_traversal() {
         let mut graph = UndirectedGraph::new();
 
-        graph.add_vertex(0, 'S');
-        graph.add_vertex(1, 'A');
-        graph.add_vertex(2, 'B');
-        graph.add_vertex(3, 'C');
-        graph.add_vertex(4, 'D');
-        graph.add_vertex(5, 'E');
+        graph.add_vertex();
+        graph.add_vertex();
+        graph.add_vertex();
+        graph.add_vertex();
+        graph.add_vertex();
+        graph.add_vertex();
 
         graph.add_edge(0, 1).unwrap();
         graph.add_edge(0, 2).unwrap();
@@ -407,16 +409,16 @@ mod tests {
     #[test]
     fn test_bfs_traversal_disconnected_graph() {
         let mut graph = UndirectedGraph::new();
-        graph.add_vertex(1, 'A');
-        graph.add_vertex(2, 'B');
-        graph.add_vertex(3, 'C');
-        graph.add_vertex(4, 'D');
+        graph.add_vertex();
+        graph.add_vertex();
+        graph.add_vertex();
+        graph.add_vertex();
 
+        let _ = graph.add_edge(0, 1);
         let _ = graph.add_edge(1, 2);
-        let _ = graph.add_edge(2, 3);
 
-        let bfs_result = graph.bfs(1).unwrap();
-        let expected_order = vec![1, 2, 3];
+        let bfs_result = graph.bfs(0).unwrap();
+        let expected_order = vec![0, 1, 2];
         assert_eq!(bfs_result, expected_order);
     }
 
@@ -431,12 +433,12 @@ mod tests {
     fn test_shortest_path_bfs() {
         let mut graph = UndirectedGraph::new();
 
-        graph.add_vertex(0, 'S');
-        graph.add_vertex(1, 'A');
-        graph.add_vertex(2, 'B');
-        graph.add_vertex(3, 'C');
-        graph.add_vertex(4, 'D');
-        graph.add_vertex(5, 'E');
+        graph.add_vertex();
+        graph.add_vertex();
+        graph.add_vertex();
+        graph.add_vertex();
+        graph.add_vertex();
+        graph.add_vertex();
 
         graph.add_edge(0, 1).unwrap();
         graph.add_edge(0, 2).unwrap();
@@ -459,9 +461,9 @@ mod tests {
     #[test]
     fn test_shortest_path_bfs_no_path() {
         let mut graph = UndirectedGraph::new();
-        graph.add_vertex(0, 'A');
-        graph.add_vertex(1, 'B');
-        graph.add_vertex(2, 'C');
+        graph.add_vertex();
+        graph.add_vertex();
+        graph.add_vertex();
 
         let shortest_paths = graph.shortest_path_bfs(0).unwrap();
 
@@ -475,10 +477,10 @@ mod tests {
     fn test_disconnected_graph_shortest_path_bfs() {
         let mut graph = UndirectedGraph::new();
 
-        graph.add_vertex(0, 'A');
-        graph.add_vertex(1, 'B');
-        graph.add_vertex(2, 'C');
-        graph.add_vertex(3, 'D');
+        graph.add_vertex();
+        graph.add_vertex();
+        graph.add_vertex();
+        graph.add_vertex();
 
         graph.add_edge(0, 1).unwrap();
         graph.add_edge(2, 3).unwrap();
@@ -497,16 +499,16 @@ mod tests {
         // example 8.3.4 in the book
         let mut graph = UndirectedGraph::new();
 
-        graph.add_vertex(0, 'S');
-        graph.add_vertex(1, 'A');
-        graph.add_vertex(2, 'B');
-        graph.add_vertex(3, 'C');
-        graph.add_vertex(4, 'D');
-        graph.add_vertex(5, 'E');
-        graph.add_vertex(6, 'F');
-        graph.add_vertex(7, 'G');
-        graph.add_vertex(8, 'H');
-        graph.add_vertex(9, 'L');
+        graph.add_vertex();
+        graph.add_vertex();
+        graph.add_vertex();
+        graph.add_vertex();
+        graph.add_vertex();
+        graph.add_vertex();
+        graph.add_vertex();
+        graph.add_vertex();
+        graph.add_vertex();
+        graph.add_vertex();
 
         graph.add_edge(0, 4).unwrap();
         graph.add_edge(0, 2).unwrap();

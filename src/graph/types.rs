@@ -9,6 +9,6 @@ pub enum GraphError {
 }
 
 pub trait Graph {
-    fn add_vertex(&mut self, index: VertexIndex, value: char);
+    fn add_vertex(&mut self);
     fn add_edge(&mut self, from: VertexIndex, to: VertexIndex) -> Result<(), GraphError>;
 }

@@ -9,16 +9,15 @@ use std::{
 
 use super::{GraphError, VertexIndex};
 
-/// representing a graph using an adjacency list which is
-/// 1) An array containing the graph vertices
-/// 2) An array containing the graph edges
-/// 3) For each edge, a pointer to each of its two endpoints
-/// 4) for each vertex, a pointer to each of the incident edges
-///
-/// for directed graph:
-/// each edge keeps track of which endpoint is tail and which endpoint is head
-/// each vertex maintains two arrays of pointers, one for the outgoing edges and one for the incoming edges
-///
+// representing a graph using an adjacency list which is
+// 1) An array containing the graph vertices
+// 2) An array containing the graph edges
+// 3) For each edge, a pointer to each of its two endpoints
+// 4) for each vertex, a pointer to each of the incident edges
+//
+// for directed graph:
+// each edge keeps track of which endpoint is tail and which endpoint is head
+// each vertex maintains two arrays of pointers, one for the outgoing edges and one for the incoming edges
 
 type VertexRc = Rc<RefCell<Vertex>>;
 type VertexWeak = Weak<RefCell<Vertex>>;
