@@ -32,4 +32,4 @@ jobs:
             - Automatically generated release for version ${{ github.ref_name }}.
           draft: false
           prerelease: false
-          artifacts: dist/algorithms-illuminated-v${{ github.ref_name }}.tar.gz
+          artifacts: dist/algorithms-illuminated-${{ github.ref_name }}.tar.gz
