@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use super::{Graph, GraphError, Length, VertexIndex};
 use std::collections::VecDeque;
@@ -269,13 +269,120 @@ impl UndirectedGraph {
     ///     (v*,w*) := such an edge minimizing len(v) + lvw
     ///     add w* to X
     ///     len(w*) := len(v*) + lv*w*
-    pub fn dijkstra(&self) {
-        todo!()
+    pub fn dijkstra(
+        &self,
+        start: VertexIndex,
+    ) -> Result<BTreeMap<VertexIndex, Length>, GraphError> {
+        if !self.is_valid_vertex(start) {
+            return Err(GraphError::VertexNotFound);
+        }
+        // using BTreeMap instead of a hashmap to get a result sorted by key order
+        let mut distances: BTreeMap<VertexIndex, Length> = BTreeMap::new();
+
+        // Initialize distances to infinity and start vertex to 0.
+        for vertex in 0..self.vertices.len() {
+            distances.insert(vertex, usize::MAX);
+        }
+        distances.insert(start, 0);
+
+        // Set of vertices for which the shortest distance is finalized.
+        let mut x: HashSet<VertexIndex> = HashSet::new();
+        x.insert(start);
+
+        while x.len() < self.vertices.len() {
+            let mut candidate_edge: Option<(VertexIndex, VertexIndex, Length)> = None;
+
+            // Find the edge (v*, w*) minimizing len(v) + lvw.
+            for &v in &x {
+                for &(w, weight) in &self.vertices[v].edges {
+                    if !x.contains(&w) {
+                        let new_distance = distances[&v].saturating_add(weight);
+                        if candidate_edge.is_none() || new_distance < candidate_edge.unwrap().2 {
+                            candidate_edge = Some((v, w, new_distance));
+                        }
+                    }
+                }
+            }
+
+            if let Some((_, w_star, len_w_star)) = candidate_edge {
+                x.insert(w_star);
+                distances.insert(w_star, len_w_star);
+            } else {
+                break; // No more edges to process.
+            }
+        }
+
+        Ok(distances)
     }
 
     /// Validates if a vertex index exists
     fn is_valid_vertex(&self, index: VertexIndex) -> bool {
         index < self.vertices.len()
+    }
+
+    /// Creates a graph from a text file containing an adjacency list.
+    /// Each line of the file represents a vertex and its edges in the format:
+    /// "<vertex> <neighbor1,length1> <neighbor2,length2> ..."
+    ///
+    /// For example:
+    /// "6 141,8200 74,510 ..." means vertex 6 is connected to 141 with weight 8200, and 74 with weight 510.
+    pub fn from_file(file_path: &str) -> Result<Self, std::io::Error> {
+        use std::fs::File;
+        use std::io::{BufRead, BufReader};
+
+        let file = File::open(file_path)?;
+        let reader = BufReader::new(file);
+
+        let mut graph = UndirectedGraph::new();
+
+        for line in reader.lines() {
+            let line = line?;
+            let parts: Vec<&str> = line.split_whitespace().collect();
+
+            if parts.is_empty() {
+                continue;
+            }
+
+            let vertex: usize = parts[0].parse().expect("Invalid vertex index");
+
+            while graph.vertices.len() < vertex {
+                graph.add_vertex();
+            }
+
+            for edge in &parts[1..] {
+                let edge_parts: Vec<&str> = edge.split(',').collect();
+                if edge_parts.len() != 2 {
+                    continue;
+                }
+
+                let neighbor: usize = edge_parts[0].parse().expect("Invalid neighbor index");
+                let length: Length = edge_parts[1].parse().expect("Invalid edge length");
+
+                while graph.vertices.len() < neighbor {
+                    graph.add_vertex();
+                }
+
+                if !graph.vertices[vertex - 1]
+                    .edges
+                    .iter()
+                    .any(|&(v, _)| v == neighbor - 1)
+                {
+                    graph.add_edge(vertex - 1, neighbor - 1, length).unwrap();
+                }
+            }
+        }
+
+        Ok(graph)
+    }
+    /// Prints the graph in a readable format.
+    pub fn print_graph(&self) {
+        for (index, vertex) in self.vertices.iter().enumerate() {
+            print!("{}:", index + 1);
+            for &(neighbor, length) in &vertex.edges {
+                print!(" {}({})", neighbor + 1, length);
+            }
+            println!();
+        }
     }
 }
 
@@ -546,5 +653,38 @@ mod tests {
         expected_sorted.sort();
 
         assert_eq!(sorted_components, expected_sorted);
+    }
+
+    #[test]
+    fn test_dijkstra() {
+        // Create a simple graph
+        let mut graph = UndirectedGraph::new();
+        for _ in 0..5 {
+            graph.add_vertex();
+        }
+
+        // Add edges
+        graph.add_edge(0, 1, 4).unwrap();
+        graph.add_edge(0, 2, 1).unwrap();
+        graph.add_edge(2, 1, 2).unwrap();
+        graph.add_edge(1, 3, 1).unwrap();
+        graph.add_edge(3, 4, 3).unwrap();
+        graph.add_edge(2, 4, 10).unwrap();
+
+        // Run Dijkstra's algorithm from vertex 0
+        let distances = graph.dijkstra(0).expect("Dijkstra failed");
+
+        // Expected distances
+        let expected_distances = vec![
+            (0, 0), // Distance to itself is 0
+            (1, 3), // Path: 0 -> 2 -> 1
+            (2, 1), // Direct edge: 0 -> 2
+            (3, 4), // Path: 0 -> 2 -> 1 -> 3
+            (4, 7), // Path: 0 -> 2 -> 1 -> 3 -> 4
+        ];
+
+        for (vertex, expected_distance) in expected_distances {
+            assert_eq!(distances[&vertex], expected_distance, "Vertex: {}", vertex);
+        }
     }
 }

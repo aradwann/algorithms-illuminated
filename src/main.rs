@@ -1,7 +1,7 @@
-use algorithms_illuminated::graph::DirectedGraph;
+use algorithms_illuminated::graph::UndirectedGraph;
 fn main() {
-    let graph = DirectedGraph::build_from_file("src/graph/txt/scc_test1.txt", true).unwrap();
-    let counts = graph.get_top_five_sccs();
-
-    println!("{:?}", counts);
+    let graph: UndirectedGraph = UndirectedGraph::from_file("src/graph/txt/dijkstra1.txt").unwrap();
+    graph.print_graph();
+    let result = graph.dijkstra(0).unwrap();
+    println!("{:?}", result);
 }
