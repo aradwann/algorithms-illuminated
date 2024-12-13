@@ -687,4 +687,35 @@ mod tests {
             assert_eq!(distances[&vertex], expected_distance, "Vertex: {}", vertex);
         }
     }
+    #[test]
+    fn test_dijkstra_no_path() {
+        // Create a graph with disconnected components
+        let mut graph = UndirectedGraph::new();
+        for _ in 0..6 {
+            graph.add_vertex();
+        }
+
+        // Add edges only between some vertices
+        graph.add_edge(0, 1, 3).unwrap();
+        graph.add_edge(1, 2, 5).unwrap();
+        graph.add_edge(3, 4, 2).unwrap();
+        // Vertex 5 is completely disconnected
+
+        // Run Dijkstra's algorithm from vertex 0
+        let distances = graph.dijkstra(0).expect("Dijkstra failed");
+
+        // Expected distances
+        let expected_distances = vec![
+            (0, 0),          // Distance to itself is 0
+            (1, 3),          // Direct edge: 0 -> 1
+            (2, 8),          // Path: 0 -> 1 -> 2
+            (3, usize::MAX), // No path to vertex 3
+            (4, usize::MAX), // No path to vertex 4
+            (5, usize::MAX), // No path to vertex 5 (completely disconnected)
+        ];
+
+        for (vertex, expected_distance) in expected_distances {
+            assert_eq!(distances[&vertex], expected_distance, "Vertex: {}", vertex);
+        }
+    }
 }
