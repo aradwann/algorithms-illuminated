@@ -1,17 +1,17 @@
-use algorithms_illuminated::graph::UndirectedGraph;
+use algorithms_illuminated::sort::compute_median_sum;
+
 fn main() {
-    let graph: UndirectedGraph =
-        UndirectedGraph::from_file("src/graph/txt/dijkstraData.txt").unwrap();
-    let result = graph.dijkstra(0).unwrap();
-    //   println!("{:?}", result);
-    println!("{:?}", result.get(&6).unwrap());
-    println!("{:?}", result.get(&36).unwrap());
-    println!("{:?}", result.get(&58).unwrap());
-    println!("{:?}", result.get(&81).unwrap());
-    println!("{:?}", result.get(&98).unwrap());
-    println!("{:?}", result.get(&114).unwrap());
-    println!("{:?}", result.get(&132).unwrap());
-    println!("{:?}", result.get(&164).unwrap());
-    println!("{:?}", result.get(&187).unwrap());
-    println!("{:?}", result.get(&196).unwrap());
+    let filename = "src/sort/txt/medians.txt";
+
+    match compute_median_sum(filename) {
+        Ok(result) => {
+            println!(
+                "The last 4 digits of the sum of the kth medians: {:04}",
+                result
+            );
+        }
+        Err(e) => {
+            eprintln!("Error: {}", e);
+        }
+    }
 }

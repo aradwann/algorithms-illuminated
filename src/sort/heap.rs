@@ -2,6 +2,8 @@ use std::{
     cmp::{Ordering, Reverse},
     collections::BinaryHeap,
     fmt::Debug,
+    fs::File,
+    io::{BufRead, BufReader},
 };
 
 /// Pseudocode
@@ -65,6 +67,40 @@ pub fn get_median(arr: Vec<i32>) -> f64 {
             (*max_heap.peek().unwrap() as f64 + min_heap.peek().unwrap().0 as f64) / 2.0
         }
     }
+}
+
+/// Compute the sum of kth medians modulo 10000
+pub fn compute_median_sum(filename: &str) -> Result<u32, Box<dyn std::error::Error>> {
+    let file = File::open(filename)?;
+    let reader = BufReader::new(file);
+
+    let mut lower_half = BinaryHeap::new(); // Max-heap for the smaller half
+    let mut upper_half = BinaryHeap::new(); // Min-heap for the larger half (Reverse for min-heap)
+    let mut median_sum = 0;
+
+    for line in reader.lines() {
+        let num: i32 = line?.trim().parse()?;
+
+        // Add the number to one of the heaps
+        if lower_half.is_empty() || num <= *lower_half.peek().unwrap() {
+            lower_half.push(num);
+        } else {
+            upper_half.push(Reverse(num));
+        }
+
+        // Rebalance the heaps
+        if lower_half.len() > upper_half.len() + 1 {
+            upper_half.push(Reverse(lower_half.pop().unwrap()));
+        } else if upper_half.len() > lower_half.len() {
+            lower_half.push(upper_half.pop().unwrap().0);
+        }
+
+        // Get the median for the current k (1-based index)
+        let median = *lower_half.peek().unwrap();
+        median_sum = (median_sum + median as u32) % 10000;
+    }
+
+    Ok(median_sum)
 }
 
 #[cfg(test)]
