@@ -61,13 +61,13 @@ pub fn two_sum_distinct_pairs(arr: Vec<i32>, target: i32) -> i32 {
     count
 }
 
-pub fn count_distinct_sums_in_range(arr: Vec<i64>, t_min: i64, t_max: i64) -> usize {
+pub fn count_distinct_sums_in_range(arr: &[i64], t_min: i64, t_max: i64) -> usize {
     let mut valid_targets = HashSet::new();
     let numbers: HashSet<i64> = arr.iter().copied().collect();
 
     // Iterate over all target values in the range
     for t in t_min..=t_max {
-        for &x in &arr {
+        for &x in arr {
             let y = t - x;
 
             // Check if y exists in the set and x != y
@@ -145,7 +145,7 @@ mod tests {
         let t_max = 10;
 
         // Act
-        let result = count_distinct_sums_in_range(arr, t_min, t_max);
+        let result = count_distinct_sums_in_range(&arr, t_min, t_max);
 
         // Assert
         assert_eq!(result, 8);
@@ -160,7 +160,7 @@ mod tests {
         let t_max = 10;
 
         // Act
-        let result = count_distinct_sums_in_range(arr, t_min, t_max);
+        let result = count_distinct_sums_in_range(&arr, t_min, t_max);
 
         // Assert
         assert_eq!(result, 8);

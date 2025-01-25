@@ -6,6 +6,6 @@ fn main() {
     let vec = build_vec_from_txt(filename).unwrap();
 
     let num_of_distinct_pairs =
-        algorithms_illuminated::hashmap::count_distinct_sums_in_range(vec, -1000, 1000);
+        algorithms_illuminated::hashmap::count_distinct_sums_in_range(&vec, -10000, 10000);
     println!("Number of distinct pairs: {}", num_of_distinct_pairs);
 }
