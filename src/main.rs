@@ -1,17 +1,11 @@
-use algorithms_illuminated::sort::compute_median_sum;
+use algorithms_illuminated::sort::build_vec_from_txt;
 
 fn main() {
-    let filename = "src/sort/txt/medians.txt";
+    let filename = "src/hashmap/txt/problem12.4.txt";
 
-    match compute_median_sum(filename) {
-        Ok(result) => {
-            println!(
-                "The last 4 digits of the sum of the kth medians: {:04}",
-                result
-            );
-        }
-        Err(e) => {
-            eprintln!("Error: {}", e);
-        }
-    }
+    let vec = build_vec_from_txt(filename).unwrap();
+
+    let num_of_distinct_pairs =
+        algorithms_illuminated::hashmap::count_distinct_sums_in_range(vec, -1000, 1000);
+    println!("Number of distinct pairs: {}", num_of_distinct_pairs);
 }

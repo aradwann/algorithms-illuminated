@@ -3,7 +3,7 @@ use std::{
     io::{self, BufRead, BufReader},
 };
 
-pub fn build_vec_from_txt(path: &str) -> io::Result<Vec<i32>> {
+pub fn build_vec_from_txt(path: &str) -> io::Result<Vec<i64>> {
     let file = File::open(path)?;
     let reader = BufReader::new(file);
 
@@ -11,7 +11,7 @@ pub fn build_vec_from_txt(path: &str) -> io::Result<Vec<i32>> {
         .lines()
         .map(|line| {
             line.and_then(|line| {
-                line.parse::<i32>()
+                line.parse::<i64>()
                     .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
             })
         })

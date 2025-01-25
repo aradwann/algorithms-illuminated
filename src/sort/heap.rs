@@ -72,7 +72,7 @@ pub fn get_median(arr: Vec<i32>) -> f64 {
 /// Compute the sum of kth medians modulo 10000
 pub fn compute_median_sum(filename: &str) -> Result<u32, Box<dyn std::error::Error>> {
     let file = File::open(filename)?;
-    let reader = BufReader::new(file);
+    let reader: BufReader<File> = BufReader::new(file);
 
     let mut lower_half = BinaryHeap::new(); // Max-heap for the smaller half
     let mut upper_half = BinaryHeap::new(); // Min-heap for the larger half (Reverse for min-heap)
