@@ -1,3 +1,3 @@
-mod hashmap;
+mod two_sum;
 
-pub use hashmap::*;
+pub use two_sum::*;
